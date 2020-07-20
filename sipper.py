@@ -46,6 +46,3 @@ class Sipper():
     def __repr__(self):
         """Shows the directory used to make the file."""
         return 'Sipper("' + self.path + '")'
-
-s = Sipper(r"C:\Users\earne\Box\20200313 Behavior Study sipper data\4\SIP004_021220_00.CSV")
-d = s.data

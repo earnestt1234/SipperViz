@@ -270,9 +270,8 @@ def date_format_x(ax, start, end):
     ax.xaxis.set_major_formatter(xfmt)
     ax.xaxis.set_minor_locator(minor)
 
-def drinkcount(sipper, left=True, right=True, shade_dark=True, lights_on=7,
-               lights_off=19,
-               **kwargs):
+def drinkcount_cumulative(sipper, left=True, right=True, shade_dark=True, lights_on=7,
+                          lights_off=19, **kwargs):
     if 'ax' in kwargs:
         ax = kwargs['ax']
     else:
@@ -280,10 +279,10 @@ def drinkcount(sipper, left=True, right=True, shade_dark=True, lights_on=7,
     df = sipper.data
     if left:
         ax.plot(df.index, df['LeftCount'], drawstyle='steps', color='red',
-                label='Left')
+                label=sipper.left_name)
     if right:
         ax.plot(df.index, df['RightCount'], drawstyle='steps', color='blue',
-                label='Right')
+                label=sipper.right_name)
     date_format_x(ax, df.index[0], df.index[-1])
     ax.set_title('Drink Count for ' + sipper.filename)
     ax.set_ylabel('Drinks')

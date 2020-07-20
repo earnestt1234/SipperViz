@@ -14,27 +14,28 @@ sipperplots.drinkcount(s2, left=True, right=True, shade_dark=True,
                        lights_on=7, lights_off=19)
 
 #%%
-import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, Tk, Toplevel
 
-root = tk.Tk()
+root = Tk()
+welcome_window = Toplevel(root)
+welcome_window.title('Welcome')
 
-# root.columnconfigure(0,weight=1)
-root.rowconfigure(0,weight=1)
+lab_window = Toplevel(root)
+lab_window.title('Lab')
 
-panes = ttk.Panedwindow(root,orient='vertical')
-panes.grid(row=0,column=0,sticky='nsew')
+root.withdraw() # hide root window
+lab_window.withdraw() # hide lab window
 
-f1 = ttk.Frame(panes)
-f2 = ttk.Frame(panes)
-f1.grid_rowconfigure(0,weight=1)
-f2.grid_rowconfigure(0,weight=1)
+def goto_lab():
+    welcome_window.destroy()
+    lab_window.deiconify() # show lab window
 
-t1 = ttk.Treeview(f1, height=20)
-t1.grid(row=0,column=0,sticky='nsew')
-t2 = ttk.Treeview(f2, height=10)
-t2.grid(row=0,column=0,sticky='nsew')
-panes.add(f1, weight=10)
-panes.add(f2, weight=1)
+button1 = ttk.Button(welcome_window, text='Close',\
+                     command=goto_lab)
+button1.pack(padx=100, pady=50)
+
+button2 = ttk.Button(lab_window, text='Close',\
+                     command=quit)
+button2.pack(padx=100, pady=50)
 
 root.mainloop()
