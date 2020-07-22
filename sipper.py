@@ -38,6 +38,7 @@ class Sipper():
         self.start_date = self.data.index[0]
         self.end_date = self.data.index[-1]
         self.duration = self.end_date - self.start_date
+        self.contents_dates = {}
 
         #information attributes
         self.basename = os.path.basename(path)
@@ -54,6 +55,7 @@ class Sipper():
     def assign_contents(self, d):
         self.contents = []
         for (start, end), (left, right) in d.items():
+            self.contents_dates[(start,end)] = (left,right)
             if start not in self.data.index:
                 before = self.data.index[self.data.index < start].max()
                 if not pd.isna(before):
@@ -71,4 +73,7 @@ class Sipper():
     def get_drinkcount(self, content):
         subset = self.data[(content in self.data['LeftContents']) |
                            (content in self.data['RightContents'])]
+        changes = d['LeftContents'].ne(d['LeftContents'].shift().bfill())
+        changes = changes.astype(int).cumsum()
+
 

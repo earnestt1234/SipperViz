@@ -17,12 +17,14 @@ s.assign_contents({(t1,t2):("Water","Oxy"),
                    (t3,t4):('Water',"Oxy")})
 d = s.data
 
-d['LeftContents'].ne(d['LeftContents'].shift().bfill()).astype(int).cumsum()
+groups = d['LeftContents'].ne(d['LeftContents'].shift().bfill()).astype(int).cumsum()
 
-# s2 = sipper.Sipper(path2)
 
-# d2 = s2.data
 
-# sipperplots.drinkcount(s2, left=True, right=True, shade_dark=True,
-#                        lights_on=7, lights_off=19)
+def groupby_drinkcount(df, content):
+    if content in df['LeftContents']:
+        return df.loc[:,['LeftCount','LeftContents']]
+    else:
+        return df.loc[:,['RightCount','RightContents']]
 
+gr = d.groupby(groups).apply(groupby_drinkcount, content='Oxy')
