@@ -1,7 +1,9 @@
 """Code to run SipViz."""
 
+import datetime as dt
 from collections import OrderedDict
 import inspect
+import os
 from PIL import Image, ImageTk
 import traceback
 import tkinter as tk
@@ -11,6 +13,8 @@ import matplotlib as mpl
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
+import pandas as pd
+from tkcalendar import DateEntry
 
 import sipper
 import sipperplots
@@ -31,7 +35,9 @@ class SipperViz(tk.Tk):
         self.attr_conversion = {'Start':'start_date', 'End':'end_date',
                                 'Duration':'duration', 'Device': 'device_no',
                                 'Left Sipper Name':'left_name',
-                                'Right Sipper Name':'right_name'}
+                                'Right Sipper Name':'right_name',
+                                'Contents': 'contents',
+                                'Version': 'version'}
         self.file_info_names = list(self.attr_conversion.keys())
         times = []
         for xm in [' am', ' pm']:
@@ -57,12 +63,12 @@ class SipperViz(tk.Tk):
         self.loaded_plots = OrderedDict()
 
     #---create whole window
-        self.title('SipViz')
+        self.title('SipperViz')
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.main_frame = tk.Frame(self)
         self.main_frame.grid(row=0, column=0, sticky='nsew')
-        self.main_frame.grid_rowconfigure(0, weight=1)
+        self.main_frame.grid_rowconfigure(1, weight=1)
         self.main_frame.grid_columnconfigure(1, weight=1)
 
     #---create plot settings window
@@ -104,6 +110,94 @@ class SipperViz(tk.Tk):
         self.dc_showleft_box.grid(row=0, column=0, sticky='w', padx=20, pady=5)
         self.dc_showright_box.grid(row=1, column=0, sticky='w', padx=20, pady=5)
 
+    #---create assign contents window
+        self.contents_window = tk.Toplevel(self)
+        self.contents_window.withdraw()
+        self.contents_window.title('Assign Sipper contents')
+        self.contents_window.resizable(False, False)
+        self.contents_window.protocol("WM_DELETE_WINDOW",
+                                      self.close_content_window)
+
+    #---widgets for assign contents window
+        s1 = 'Enter start and end times for left and right bottle contents.'
+        s2 = 'Contents will be assigned to Sippers currently selected in the file view,'
+        s3 = 'and they will be assigned in order from top to bottom.'
+        intro = ' '.join([s1, s2, s3])
+        self.contents_intro = tk.Label(self.contents_window, text=intro,
+                                       wraplength=800, justify='left')
+        self.sdate_label = tk.Label(self.contents_window, text='Start date')
+        self.shour_label = tk.Label(self.contents_window, text='Start hour')
+        self.edate_label = tk.Label(self.contents_window, text='End date')
+        self.ehour_label = tk.Label(self.contents_window, text='End hour')
+        self.lcontent_label = tk.Label(self.contents_window,
+                                       text='Left bottle content')
+        self.rcontent_label = tk.Label(self.contents_window,
+                                       text='Right bottle content')
+        self.sdate_entry = DateEntry(self.contents_window, width=10)
+        self.shour_entry = ttk.Combobox(self.contents_window, width=10,
+                                        values=times)
+        self.shour_entry.set('noon')
+        self.edate_entry = DateEntry(self.contents_window, width=10)
+        self.ehour_entry = ttk.Combobox(self.contents_window, width=10,
+                                        values=times)
+        self.ehour_entry.set('noon')
+        self.lcontent_val = tk.StringVar()
+        self.lcontent_val.set('')
+        self.lcontent_val.trace_add('write', self.update_content_buttons)
+        self.lcontent_entry = tk.Entry(self.contents_window, width=10,
+                                       textvariable=self.lcontent_val)
+        self.rcontent_val = tk.StringVar()
+        self.rcontent_val.set('')
+        self.rcontent_val.trace_add('write', self.update_content_buttons)
+        self.rcontent_entry = tk.Entry(self.contents_window, width=10,
+                                       textvariable=self.rcontent_val)
+        labels = ['Start', 'End', 'Left', 'Right']
+        self.assign_content_view = ttk.Treeview(self.contents_window,
+                                                columns=labels,
+                                                selectmode='browse')
+        self.content_add = tk.Button(self.contents_window, text='Add',
+                                     command=self.add_content)
+        self.content_delete = tk.Button(self.contents_window, text='Delete',
+                                        command=self.delete_content)
+        self.content_moveup = tk.Button(self.contents_window, text='Move Up',
+                                        command=lambda b=-1: self.move_content(b))
+        self.content_movedown = tk.Button(self.contents_window, text='Move Down',
+                                          command=lambda b=1: self.move_content(b))
+        self.content_assign = tk.Button(self.contents_window, text='Assign',
+                                        command=self.assign_content)
+        self.content_cancel = tk.Button(self.contents_window, text="Cancel",
+                                        command=self.close_content_window)
+
+        for i, name in enumerate(labels):
+            self.assign_content_view.column(name, width=150)
+            self.assign_content_view.heading(i, text=name)
+        self.assign_content_view['show'] = 'headings'
+        self.assign_content_view.bind('<<TreeviewSelect>>',
+                                      self.update_content_buttons)
+        c = 6
+        h  = int(c/2)
+        self.contents_intro.grid(row=0, column=0, sticky='nsw', columnspan=c,
+                                 pady=(30,20), padx=30)
+        self.sdate_label.grid(row=1, column=0, sticky='w', padx=20, columnspan=h)
+        self.sdate_entry.grid(row=1, column=2, sticky='nsw', columnspan=h)
+        self.shour_label.grid(row=2, column=0, sticky='w', padx=20, columnspan=h)
+        self.shour_entry.grid(row=2, column=2, sticky='nsw', columnspan=h)
+        self.edate_label.grid(row=3, column=0, sticky='w', padx=20, columnspan=h)
+        self.edate_entry.grid(row=3, column=2, sticky='nsw', columnspan=h)
+        self.ehour_label.grid(row=4, column=0, sticky='w', padx=20, columnspan=h)
+        self.ehour_entry.grid(row=4, column=2, sticky='nsw', columnspan=h)
+        self.lcontent_label.grid(row=5, column=0, sticky='w', padx=20, columnspan=h)
+        self.lcontent_entry.grid(row=5, column=2, sticky='nsw', columnspan=h)
+        self.rcontent_label.grid(row=6, column=0, sticky='w', padx=20, columnspan=h)
+        self.rcontent_entry.grid(row=6, column=2, sticky='nsw', columnspan=h)
+        self.assign_content_view.grid(row=7, column=0, sticky='nsew',
+                                      columnspan=c, pady=(30,0))
+        self.content_add.grid(row=8, column=0, sticky='nsew', padx=10, pady=5)
+        self.content_delete.grid(row=8, column=1, sticky='nsew', padx=10, pady=5)
+        self.content_moveup.grid(row=8, column=2, sticky='nsew', padx=10, pady=5)
+        self.content_movedown.grid(row=8, column=3, sticky='nsew', padx=10, pady=5)
+        self.content_assign.grid(row=8, column=4, sticky='nsew', padx=10, pady=5)
+        self.content_cancel.grid(row=8, column=5, sticky='nsew', padx=10, pady=5)
 
     #---create treeview panes (left sash)
         self.left_sash = ttk.PanedWindow(self.main_frame, orient='vertical')
@@ -134,7 +228,8 @@ class SipperViz(tk.Tk):
                  'graph':'img/graph.png',
                  'delete_graph':'img/delete_graph.png',
                  'picture':'img/picture.png',
-                 'palette':'img/palette.png'}
+                 'palette':'img/palette.png',
+                 'drop':'img/drop.png'}
         self.icons = {}
         for k, v in icons.items():
             image = Image.open(v).resize((25, 25))
@@ -166,6 +261,18 @@ class SipperViz(tk.Tk):
                                        borderwidth=0,
                                        command=print,
                                        width=40)
+        self.assign_button = tk.Button(self.button_frame,
+                                       image=self.icons['drop'],
+                                       text='Assign', compound='top',
+                                       borderwidth=0,
+                                       command=self.raise_content_window,
+                                       width=40)
+        self.savefile_button = tk.Button(self.button_frame,
+                                         image=self.icons['save'],
+                                         text='Save', compound='top',
+                                         borderwidth=0,
+                                         command=self.save_files,
+                                         width=40)
         self.plot_button = tk.Button(self.button_frame,
                                      image=self.icons['graph'],
                                      text='Plot', compound='top',
@@ -214,36 +321,40 @@ class SipperViz(tk.Tk):
                               padx=5)
         self.delete_button.grid(row=0, column=1, sticky='nsew', pady=5,
                                 padx=5)
-        self.groups_button.grid(row=0, column=2, sticky='nsew', pady=5,
+        self.savefile_button.grid(row=0, column=2, sticky='nsew', pady=5,
+                                  padx=5)
+        self.groups_button.grid(row=0, column=3, sticky='nsew', pady=5,
                                 padx=5)
-        self.concat_button.grid(row=0, column=3, sticky='nsew', pady=5,
+        self.concat_button.grid(row=0, column=4, sticky='nsew', pady=5,
+                                padx=5)
+        self.assign_button.grid(row=0, column=5, sticky='nsew', pady=5,
                                 padx=5)
         self.files_label = tk.Label(self.button_frame, text='Files')
         self.files_label.grid(row=1, column=0, sticky='nsew',
-                              columnspan=4, pady=(0, 5))
+                              columnspan=6, pady=(0, 5))
         self.sep1 = ttk.Separator(self.button_frame, orient='vertical')
-        self.sep1.grid(row=0,column=4,sticky='nsew', pady=5, rowspan=2)
-        self.plot_button.grid(row=0, column=5, sticky='nsew', pady=5,
+        self.sep1.grid(row=0,column=6,sticky='nsew', pady=5, rowspan=2)
+        self.plot_button.grid(row=0, column=7, sticky='nsew', pady=5,
                               padx=5)
-        self.plot_save_button.grid(row=0, column=6, sticky='nsew', pady=5,
+        self.plot_save_button.grid(row=0, column=8, sticky='nsew', pady=5,
                                    padx=5)
-        self.plot_delete_button.grid(row=0, column=7, sticky='nsew', pady=5,
+        self.plot_delete_button.grid(row=0, column=9, sticky='nsew', pady=5,
                                      padx=5)
-        self.plot_data_button.grid(row=0, column=8, sticky='nsew', pady=5,
+        self.plot_data_button.grid(row=0, column=10, sticky='nsew', pady=5,
                                    padx=5)
-        self.plot_code_button.grid(row=0, column=9, sticky='nsew', pady=5,
+        self.plot_code_button.grid(row=0, column=11, sticky='nsew', pady=5,
                                    padx=5)
         self.plots_label = tk.Label(self.button_frame, text='Plots')
-        self.plots_label.grid(row=1, column=5, sticky='nsew',
+        self.plots_label.grid(row=1, column=7, sticky='nsew',
                               columnspan=5, pady=(0, 5))
         self.sep2 = ttk.Separator(self.button_frame, orient='vertical')
-        self.sep2.grid(row=0,column=10,sticky='nsew', pady=5, rowspan=2)
-        self.plotopts_button.grid(row=0, column=11, sticky='nsew', pady=5,
+        self.sep2.grid(row=0,column=12,sticky='nsew', pady=5, rowspan=2)
+        self.plotopts_button.grid(row=0, column=13, sticky='nsew', pady=5,
                                   padx=5)
-        self.settings_button.grid(row=0, column=12, sticky='nsew', pady=5,
+        self.settings_button.grid(row=0, column=14, sticky='nsew', pady=5,
                                   padx=5)
         self.settings_label = tk.Label(self.button_frame, text='Settings')
-        self.settings_label.grid(row=1, column=11, sticky='nsew',
+        self.settings_label.grid(row=1, column=13, sticky='nsew',
                                  columnspan=2, pady=(0, 5))
 
     #---create file_view
@@ -343,6 +454,24 @@ class SipperViz(tk.Tk):
             del(self.loaded_sippers[index])
         self.update_file_view()
 
+    def save_files(self):
+        selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+        if len(selected) == 1:
+            s = selected[0]
+            filetypes = [('Comma-Separated Values', '*.csv')]
+            savepath = tk.filedialog.asksaveasfilename(title='Save file',
+                                                       defaultextension='.csv',
+                                                       initialfile=s.basename,
+                                                       filetypes=filetypes)
+            if savepath:
+                s.data.to_csv(savepath)
+        elif len(selected) > 1:
+            folder = tk.filedialog.askdirectory(title='Save multiple files')
+            if folder:
+                for s in selected:
+                    savepath = os.path.join(folder, s.basename)
+                    savepath = self.create_file_name(savepath)
+                    s.data.to_csv(savepath)
 
     def update_file_view(self):
         self.file_view.delete(*self.file_view.get_children())
@@ -402,6 +531,15 @@ class SipperViz(tk.Tk):
             c += 1
         return fig_name
 
+    def create_file_name(self, savepath, overwrite=False):
+        root, ext = os.path.splitext(savepath)
+        if not overwrite:
+            c=1
+            while os.path.exists(savepath):
+                savepath = root + ' ' + str(c) + ext
+                c += 1
+        return savepath
+
     def raise_plot_from_click(self, event):
         clicked = self.plot_list.selection()
         if len(clicked) == 1:
@@ -415,6 +553,83 @@ class SipperViz(tk.Tk):
             if nice_name:
                 text = nice_name + ' : ' + str(v)
                 self.plot_info.insert('', i, text=text)
+
+    #---content window functions
+    def raise_content_window(self):
+        self.assign_content_view.delete(*self.assign_content_view.get_children())
+        self.contents_window.deiconify()
+        self.contents_window.grab_set()
+        self.update_content_buttons()
+
+    def get_content_dates(self):
+        sdate = self.sdate_entry.get_date()
+        shour = self.times_to_int[self.shour_entry.get()]
+        edate = self.edate_entry.get_date()
+        ehour = self.times_to_int[self.ehour_entry.get()]
+        start = dt.datetime.combine(sdate, dt.time(hour=shour))
+        end = dt.datetime.combine(edate, dt.time(hour=ehour))
+        return start, end
+
+    def get_content_dict(self):
+        output = OrderedDict()
+        to_assign = self.assign_content_view.get_children()
+        for c in to_assign:
+            s, e, l, r = self.assign_content_view.item(c)['values']
+            s = pd.to_datetime(s)
+            e = pd.to_datetime(e)
+            output[(s,e)] = (l,r)
+        return output
+
+    def add_content(self):
+        s, e = self.get_content_dates()
+        values = [s, e, self.lcontent_val.get(), self.rcontent_val.get()]
+        allvals = self.assign_content_view.get_children()
+        self.assign_content_view.insert('', 'end', len(allvals), values=values)
+        self.update_content_buttons()
+
+    def delete_content(self):
+        selected = self.assign_content_view.selection()
+        self.assign_content_view.delete(selected)
+        self.update_content_buttons()
+
+    def move_content(self, by):
+        selected = self.assign_content_view.selection()
+        index = self.assign_content_view.index(selected)
+        self.assign_content_view.move(selected, '', index + by)
+
+    def assign_content(self):
+        d = self.get_content_dict()
+        files = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+        if files:
+            for f in files:
+                f.assign_contents(d)
+        self.contents_window.withdraw()
+        self.display_details()
+
+    def update_content_buttons(self, *event):
+        entries = self.assign_content_view.get_children()
+        selected = self.assign_content_view.selection()
+        if len(selected) == 1:
+            self.content_moveup.configure(state='normal')
+            self.content_movedown.configure(state='normal')
+            self.content_delete.configure(state='normal')
+        else:
+            self.content_moveup.configure(state='disabled')
+            self.content_movedown.configure(state='disabled')
+            self.content_delete.configure(state='disabled')
+        if entries:
+            self.content_assign.configure(state='normal')
+        else:
+            self.content_assign.configure(state='disabled')
+        if self.lcontent_val.get() and self.rcontent_val.get():
+            self.content_add.configure(state='normal')
+        else:
+            self.content_add.configure(state='disabled')
+
+    def close_content_window(self):
+        self.contents_window.grab_release()
+        self.grab_set()
+        self.contents_window.withdraw()
 
 plt.style.use('seaborn-whitegrid')
 root = SipperViz()
