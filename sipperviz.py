@@ -37,7 +37,7 @@ class SipperViz(tk.Tk):
                                 'Left Sipper Name':'left_name',
                                 'Right Sipper Name':'right_name',
                                 'Contents': 'contents',
-                                'Version': 'version'}
+                                'Version': 'version', 'Groups':'groups'}
         self.file_info_names = list(self.attr_conversion.keys())
         times = []
         for xm in [' am', ' pm']:
@@ -84,13 +84,39 @@ class SipperViz(tk.Tk):
         # all plots
         self.allplot_settings = tk.Frame(self.plot_settings_window)
         self.plot_settings_tabs.add(self.allplot_settings, text='All Plots')
+        self.date_filter_val = tk.BooleanVar()
+        self.date_filter_val.set(False)
+        self.date_filter_box = ttk.Checkbutton(self.allplot_settings,
+                                               text='Globally filter dates',
+                                               var=self.date_filter_val,
+                                               command=self.set_date_filter_state)
+        self.dfilter_s_label = tk.Label(self.allplot_settings,
+                                        text='Start date/time')
+        self.dfilter_e_label = tk.Label(self.allplot_settings,
+                                        text='End date/time')
+        self.dfilter_s_date = DateEntry(self.allplot_settings, width=10)
+        self.dfilter_e_date = DateEntry(self.allplot_settings, width=10)
+        self.dfilter_s_hour = ttk.Combobox(self.allplot_settings,
+                                           values=times,
+                                           width=10)
+        self.dfilter_e_hour = ttk.Combobox(self.allplot_settings,
+                                           values=times,
+                                           width=10)
+        self.dfilter_s_hour.set('noon')
+        self.dfilter_e_hour.set('noon')
         self.shade_dark_val = tk.BooleanVar()
         self.shade_dark_val.set(True)
         self.shade_dark_box = ttk.Checkbutton(self.allplot_settings,
                                               variable=self.shade_dark_val,
-                                              text='Shade dark periods')
-
-        self.shade_dark_box.grid(row=0, column=0, sticky='w', padx=20, pady=5)
+                                              text='Shade dark periods (set light cycle under General Settings)')
+        self.date_filter_box.grid(row=0, column=0, sticky='w', padx=20, pady=5)
+        self.dfilter_s_label.grid(row=1, column=0, sticky='w', padx=40)
+        self.dfilter_s_date.grid(row=1, column=1, sticky='nsew')
+        self.dfilter_s_hour.grid(row=1, column=2, sticky='nsew')
+        self.dfilter_e_label.grid(row=2, column=0, sticky='w', padx=40)
+        self.dfilter_e_date.grid(row=2, column=1, sticky='nsew')
+        self.dfilter_e_hour.grid(row=2, column=2, sticky='nsew')
+        self.shade_dark_box.grid(row=3, column=0, sticky='w', padx=20, pady=5)
 
         # drink count
         self.drinkcount_settings = tk.Frame(self.plot_settings_window)
@@ -109,6 +135,27 @@ class SipperViz(tk.Tk):
 
         self.dc_showleft_box.grid(row=0, column=0, sticky='w', padx=20, pady=5)
         self.dc_showright_box.grid(row=1, column=0, sticky='w', padx=20, pady=5)
+
+    #---create general settings window
+        self.general_settings = tk.Toplevel(self)
+        self.general_settings.withdraw()
+        self.general_settings.title('General settings')
+        self.general_settings.protocol("WM_DELETE_WINDOW",
+                                              self.general_settings.withdraw)
+
+    #---populate general settings window
+        self.lightson_label = tk.Label(self.general_settings, text='Lights on')
+        self.lightsoff_label = tk.Label(self.general_settings, text='Lights off')
+        self.lightson_menu = ttk.Combobox(self.general_settings, width=10,
+                                          values=times)
+        self.lightson_menu.set('7 am')
+        self.lightsoff_menu = ttk.Combobox(self.general_settings, width=10,
+                                           values=times)
+        self.lightsoff_menu.set('7 pm')
+        self.lightson_label.grid(row=0, column=0, sticky='nsw', padx=20)
+        self.lightson_menu.grid(row=0,column=1, sticky='nsew', padx=20)
+        self.lightsoff_label.grid(row=1, column=0, sticky='nsw', padx=20)
+        self.lightsoff_menu.grid(row=1,column=1, sticky='nsew', padx=20)
 
     #---create assign contents window
         self.contents_window = tk.Toplevel(self)
@@ -313,7 +360,7 @@ class SipperViz(tk.Tk):
                                          image=self.icons['gear'],
                                          text='General', compound='top',
                                          borderwidth=0,
-                                         command=print,
+                                         command=self.general_settings.deiconify,
                                          width=40)
 
     #---pack buttons, add separators, labels
@@ -434,6 +481,9 @@ class SipperViz(tk.Tk):
         self.right_sash.add(self.plot_list_frame)
         self.right_sash.add(self.plot_info_frame)
 
+    #---operations pre opening
+        self.set_date_filter_state()
+
     def load_files(self):
         file_types = [('All', '*.*'), ('Comma-Separated Values', '*.csv'),
                       ('Excel', '*.xls, *.xslx'),]
@@ -490,9 +540,15 @@ class SipperViz(tk.Tk):
                 self.info_view.insert('', i, text=text, tag='spec')
 
     def iter_plot(self, func):
+        self.bad_date_sippers = []
         sippers = [self.loaded_sippers[int(i)]
                    for i in self.file_view.selection()]
         for i, s in enumerate(sippers):
+            if self.date_filter_val.get():
+                b,e = self.get_date_filter_dates()
+                if not sipperplots.date_filter_okay(s.data, b, e):
+                        self.bad_date_sippers.append(s)
+                continue
             self.ax.clear()
             all_args = self.get_argument_settings_dict()
             func_args = inspect.getfullargspec(func).args
@@ -505,11 +561,17 @@ class SipperViz(tk.Tk):
             func(**args)
             self.plot_list.insert('', 'end', iid=plot.name, values=[plot.name])
             self.display_plot(plot, new=True)
+        if self.bad_date_sippers:
+            self.raise_dfilter_error()
 
     def get_argument_settings_dict(self):
+        lon = self.times_to_int[self.lightson_menu.get()]
+        loff = self.times_to_int[self.lightsoff_menu.get()]
         settings_dict = {'shade_dark':self.shade_dark_val.get(),
                          'show_left_count':self.dc_showleft_val.get(),
-                         'show_right_count':self.dc_showright_val.get()}
+                         'show_right_count':self.dc_showright_val.get(),
+                         'lights_on':lon,
+                         'lights_off':loff}
         return settings_dict
 
     def display_plot(self, plot, new=False):
@@ -554,6 +616,18 @@ class SipperViz(tk.Tk):
                 text = nice_name + ' : ' + str(v)
                 self.plot_info.insert('', i, text=text)
 
+    def set_date_filter_state(self):
+        if self.date_filter_val.get():
+            self.dfilter_s_date.configure(state='normal')
+            self.dfilter_e_date.configure(state='normal')
+            self.dfilter_s_hour.configure(state='normal')
+            self.dfilter_e_hour.configure(state='normal')
+        else:
+            self.dfilter_s_date.configure(state='disabled')
+            self.dfilter_e_date.configure(state='disabled')
+            self.dfilter_s_hour.configure(state='disabled')
+            self.dfilter_e_hour.configure(state='disabled')
+
     #---content window functions
     def raise_content_window(self):
         self.assign_content_view.delete(*self.assign_content_view.get_children())
@@ -566,6 +640,15 @@ class SipperViz(tk.Tk):
         shour = self.times_to_int[self.shour_entry.get()]
         edate = self.edate_entry.get_date()
         ehour = self.times_to_int[self.ehour_entry.get()]
+        start = dt.datetime.combine(sdate, dt.time(hour=shour))
+        end = dt.datetime.combine(edate, dt.time(hour=ehour))
+        return start, end
+
+    def get_date_filter_dates(self):
+        sdate = self.dfilter_s_date.get_date()
+        shour = self.times_to_int[self.dfilter_s_hour.get()]
+        edate = self.dfilter_e_date.get_date()
+        ehour = self.times_to_int[self.dfilter_e_hour.get()]
         start = dt.datetime.combine(sdate, dt.time(hour=shour))
         end = dt.datetime.combine(edate, dt.time(hour=ehour))
         return start, end
@@ -630,6 +713,20 @@ class SipperViz(tk.Tk):
         self.contents_window.grab_release()
         self.grab_set()
         self.contents_window.withdraw()
+
+    #---errors
+    def raise_dfilter_error(self):
+        warn_window = tk.Toplevel(self)
+        warn_window.grab_set()
+        warn_window.title('Date filter error')
+        # if not platform.system() == 'Darwin':
+        #     warn_window.iconbitmap('img/exclam.ico')
+        text = ("The following files did not have any data within the date filter" +
+                '\nPlease edit or remove the global date filter to plot them:\n')
+        for s in self.bad_date_sippers:
+            text += '\n  - ' + s.basename
+        warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
+        warning.pack(padx=(20,20),pady=(20,20))
 
 plt.style.use('seaborn-whitegrid')
 root = SipperViz()

@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+def date_filter_okay(df, start, end):
+    check = df[(df.index >= start) &
+            (df.index <= end)].copy()
+    return not check.empty
 
 def convert_dt64_to_dt(dt64):
     """Converts numpy datetime to standard datetime (needed for shade_darkness
@@ -287,7 +291,8 @@ def drinkcount_cumulative(sipper, show_left_count=True, show_right_count=True,
     if show_content_count:
         for c in show_content_count:
             count = sipper.get_content_values(c, out='Count', df=sipper.data)
-            ax.plot(count.index, count, drawstyle='steps', label=c)
+            if not count.empty:
+                ax.plot(count.index, count, drawstyle='steps', label=c)
     date_format_x(ax, df.index[0], df.index[-1])
     ax.set_title('Drink Count for ' + sipper.filename)
     ax.set_ylabel('Drinks')

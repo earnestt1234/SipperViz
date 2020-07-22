@@ -2,14 +2,18 @@
 
 from collections import OrderedDict
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
 
-def date_filter_okay(df, start, end):
-    check = df[(df.index >= start) &
-            (df.index <= end)].copy()
-    return not check.empty
+from sipperplots import date_filter_okay
+
+class SipperError(Exception):
+    """Class for sipper errors"""
+
+class SipperWarning(Warning):
+    """Class for sipper warnings"""
 
 def groupby_convertcontent(gr, content, out='Count'):
     output = []
@@ -26,9 +30,6 @@ def groupby_convertcontent(gr, content, out='Count'):
         output.append(to_append)
     output = pd.concat(output)
     return output - np.nanmin(output)
-
-class SipperError(Exception):
-    """Class for sipper errors"""
 
 class Sipper():
     def __init__(self, path):
@@ -82,6 +83,7 @@ class Sipper():
         self.duration = self.end_date - self.start_date
         self.contents_dates = OrderedDict()
         self.contents = self.set_of_contents()
+        self.groups = []
 
     def __repr__(self):
         """Shows the directory used to make the file."""
@@ -117,6 +119,10 @@ class Sipper():
         if out not in ['Count','Duration']:
             raise SipperError('method get_content_values() can only ' +
                               'use out = "Count" or out = "Duration"')
+        if content not in self.contents:
+            warnings.warn('Content "' + content + '" not found in ' + self.filename,
+                          SipperWarning)
+            return pd.Series()
         subset = df[(df['LeftContents'].isin([content])) |
                     (df['RightContents'].isin([content]))]
         changes = subset['LeftContents'].ne(subset['LeftContents'].shift().bfill())
