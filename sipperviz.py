@@ -56,7 +56,7 @@ class SipperViz(tk.Tk):
                               'lights_on': 'lights on',
                               'lights_off': 'lights off',
                               'show_left_count': 'show left',
-                              'show_right_count': 'show right',}
+                              'show_right_count': 'show right'}
 
     #---data management
         self.loaded_sippers = []
@@ -484,6 +484,7 @@ class SipperViz(tk.Tk):
     #---operations pre opening
         self.set_date_filter_state()
 
+    #---file functions
     def load_files(self):
         file_types = [('All', '*.*'), ('Comma-Separated Values', '*.csv'),
                       ('Excel', '*.xls, *.xslx'),]
@@ -528,6 +529,7 @@ class SipperViz(tk.Tk):
         for i, s in enumerate(self.loaded_sippers):
             self.file_view.insert("", i, str(i), text=s.filename, tag='file')
 
+    #---info pane functions
     def display_details(self, *event):
         self.info_view.delete(*self.info_view.get_children())
         selected = [self.loaded_sippers[int(i)]
@@ -539,20 +541,23 @@ class SipperViz(tk.Tk):
                 text = ' : '.join([name, attr])
                 self.info_view.insert('', i, text=text, tag='spec')
 
+    #---plotting functions
     def iter_plot(self, func):
         self.bad_date_sippers = []
         sippers = [self.loaded_sippers[int(i)]
                    for i in self.file_view.selection()]
         for i, s in enumerate(sippers):
-            if self.date_filter_val.get():
-                b,e = self.get_date_filter_dates()
-                if not sipperplots.date_filter_okay(s.data, b, e):
-                        self.bad_date_sippers.append(s)
-                continue
             self.ax.clear()
             all_args = self.get_argument_settings_dict()
             func_args = inspect.getfullargspec(func).args
             args = {k:v for k,v in all_args.items() if k in func_args}
+            if self.date_filter_val.get():
+                b,e = self.get_date_filter_dates()
+                if not sipperplots.date_filter_okay(s.data, b, e):
+                        self.bad_date_sippers.append(s)
+                        continue
+                else:
+                    args['date_filter'] = b, e
             args['sipper'] = s
             args['ax'] = self.ax
             name = self.create_plot_name(self.plot_default_names[func])
@@ -564,16 +569,6 @@ class SipperViz(tk.Tk):
         if self.bad_date_sippers:
             self.raise_dfilter_error()
 
-    def get_argument_settings_dict(self):
-        lon = self.times_to_int[self.lightson_menu.get()]
-        loff = self.times_to_int[self.lightsoff_menu.get()]
-        settings_dict = {'shade_dark':self.shade_dark_val.get(),
-                         'show_left_count':self.dc_showleft_val.get(),
-                         'show_right_count':self.dc_showright_val.get(),
-                         'lights_on':lon,
-                         'lights_off':loff}
-        return settings_dict
-
     def display_plot(self, plot, new=False):
         if new:
             self.plot_list.selection_remove(self.plot_list.selection())
@@ -584,24 +579,6 @@ class SipperViz(tk.Tk):
         self.canvas.draw_idle()
         self.update()
 
-    def create_plot_name(self, basename):
-        fig_name = basename
-        c = 1
-        current_names = self.loaded_plots.keys()
-        while fig_name in current_names:
-            fig_name = basename + ' ' + str(c)
-            c += 1
-        return fig_name
-
-    def create_file_name(self, savepath, overwrite=False):
-        root, ext = os.path.splitext(savepath)
-        if not overwrite:
-            c=1
-            while os.path.exists(savepath):
-                savepath = root + ' ' + str(c) + ext
-                c += 1
-        return savepath
-
     def raise_plot_from_click(self, event):
         clicked = self.plot_list.selection()
         if len(clicked) == 1:
@@ -610,11 +587,54 @@ class SipperViz(tk.Tk):
 
     def display_plot_details(self, plot):
         self.plot_info.delete(*self.plot_info.get_children())
+        dfilter = False
         for i, (k, v) in enumerate(plot.args.items()):
             nice_name = self.args_to_names.get(k, None)
             if nice_name:
                 text = nice_name + ' : ' + str(v)
                 self.plot_info.insert('', i, text=text)
+            elif k == 'date_filter':
+                dfilter = True
+                x = self.plot_info.insert('',i, text='date filter : True')
+                self.plot_info.insert(x, 0, text='start : ' + str(v[0]))
+                self.plot_info.insert(x, 1, text='end : ' + str(v[1]))
+        if not dfilter:
+            self.plot_info.insert('','end', text='date filter : False')
+
+    #---settings functions
+    def get_argument_settings_dict(self):
+        lon = self.times_to_int[self.lightson_menu.get()]
+        loff = self.times_to_int[self.lightsoff_menu.get()]
+        settings_dict = {'shade_dark':self.shade_dark_val.get(),
+                         'show_left_count':self.dc_showleft_val.get(),
+                         'show_right_count':self.dc_showright_val.get(),
+                         'lights_on':lon,
+                         'lights_off':loff}
+        return settings_dict
+
+    def get_all_settings_df(self):
+        #first get plot settings:
+        d = self.get_argument_settings_dict()
+        #then add general settings
+        d['dfilter_val'] = self.date_filter_val.get()
+        d['dfilter_sdate'] = self.dfilter_s_date.get_date()
+        d['dfilter_edate'] = self.dfilter_e_date.get_date()
+        d['dfilter_shour'] = self.times_to_int[self.dfilter_s_hour.get()]
+        d['dfilter_ehour'] = self.times_to_int[self.dfilter_e_hour.get()]
+        settings_df = pd.DataFrame(columns=['Value'])
+        for k, v in d.items():
+            settings_df.loc[k, 'Value'] = v
+        return settings_df
+
+    def load_settings_df(self, path):
+        if os.path.exists(path):
+            settings_df = pd.read_csv(path)
+        else:
+            path = tk.filedialog.askopenfilenames(title='Select FED3 Data',
+                                                  defaultextension='.csv',
+                                                  filetypes=[('Comma-Separated Values', '*.csv')],
+                                                  initialdir='memory/settings')
+
 
     def set_date_filter_state(self):
         if self.date_filter_val.get():
@@ -627,6 +647,26 @@ class SipperViz(tk.Tk):
             self.dfilter_e_date.configure(state='disabled')
             self.dfilter_s_hour.configure(state='disabled')
             self.dfilter_e_hour.configure(state='disabled')
+
+    #---naming functions
+
+    def create_file_name(self, savepath, overwrite=False):
+        root, ext = os.path.splitext(savepath)
+        if not overwrite:
+            c=1
+            while os.path.exists(savepath):
+                savepath = root + ' ' + str(c) + ext
+                c += 1
+        return savepath
+
+    def create_plot_name(self, basename):
+        fig_name = basename
+        c = 1
+        current_names = self.loaded_plots.keys()
+        while fig_name in current_names:
+            fig_name = basename + ' ' + str(c)
+            c += 1
+        return fig_name
 
     #---content window functions
     def raise_content_window(self):
@@ -728,8 +768,18 @@ class SipperViz(tk.Tk):
         warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
         warning.pack(padx=(20,20),pady=(20,20))
 
+    #---run before closing:
+    def on_close(self):
+        settings_dir = 'memory/settings'
+        if os.path.isdir(settings_dir):
+            settings_df = self.get_all_settings_df()
+            settings_df.to_csv(os.path.join(settings_dir, 'LAST_USED.csv'))
+        self.destroy()
+        self.quit()
+
 plt.style.use('seaborn-whitegrid')
 root = SipperViz()
+root.protocol("WM_DELETE_WINDOW", root.on_close)
 if __name__ == "__main__":
     root.lift()
     root.attributes('-topmost', True)

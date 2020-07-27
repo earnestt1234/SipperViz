@@ -282,6 +282,10 @@ def drinkcount_cumulative(sipper, show_left_count=True, show_right_count=True,
     else:
         fig, ax = plt.subplots()
     df = sipper.data
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
     if show_left_count:
         ax.plot(df.index, df['LeftCount'], drawstyle='steps', color='red',
                 label=sipper.left_name)
