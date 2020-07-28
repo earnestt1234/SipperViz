@@ -39,7 +39,7 @@ class SipperViz(tk.Tk):
                                 'Contents': 'contents',
                                 'Version': 'version', 'Groups':'groups'}
         self.file_info_names = list(self.attr_conversion.keys())
-        times = []
+        self.times = []
         for xm in [' am', ' pm']:
             for num in range(0,12):
                 time = str(num) + xm
@@ -47,9 +47,9 @@ class SipperViz(tk.Tk):
                     time = 'midnight'
                 if time == '0 pm':
                     time = 'noon'
-                times.append(time)
+                self.times.append(time)
 
-        self.times_to_int = {time : num for num,time in enumerate(times)}
+        self.times_to_int = {time : num for num,time in enumerate(self.times)}
         self.plot_default_names = {sipperplots.drinkcount_cumulative:
                                    'Drink Count (Cumulative)'}
         self.args_to_names = {'shade_dark':'shade dark',
@@ -61,6 +61,27 @@ class SipperViz(tk.Tk):
     #---data management
         self.loaded_sippers = []
         self.loaded_plots = OrderedDict()
+        self.avail_contents = []
+
+    #---load button images
+        icons = {'gear':"img/settings_icon.gif",
+                 'bottle':'img/bottle_icon.png',
+                 'delete_bottle':'img/delete_bottle.png',
+                 'tack':'img/tack.png',
+                 'paperclip':'img/paperclip.png',
+                 'save':'img/save.png',
+                 'script':'img/script.png',
+                 'spreadsheet':'img/spreadsheet.png',
+                 'graph':'img/graph.png',
+                 'delete_graph':'img/delete_graph.png',
+                 'picture':'img/picture.png',
+                 'palette':'img/palette.png',
+                 'drop':'img/drop.png',
+                 'swap':'img/swap.png'}
+        self.icons = {}
+        for k, v in icons.items():
+            image = Image.open(v).resize((25, 25))
+            self.icons[k] = ImageTk.PhotoImage(image)
 
     #---create whole window
         self.title('SipperViz')
@@ -84,44 +105,72 @@ class SipperViz(tk.Tk):
         # all plots
         self.allplot_settings = tk.Frame(self.plot_settings_window)
         self.plot_settings_tabs.add(self.allplot_settings, text='All Plots')
+
+        self.allplots_top = tk.Frame(self.allplot_settings)
+        self.contentselect_frame = tk.Frame(self.allplot_settings)
+        self.allplots_top.grid(row=0, column=0, sticky='nsew')
+        self.contentselect_frame.grid(row=1, column=0, sticky='nsew', pady=40)
+
         self.date_filter_val = tk.BooleanVar()
         self.date_filter_val.set(False)
-        self.date_filter_box = ttk.Checkbutton(self.allplot_settings,
+        self.date_filter_box = ttk.Checkbutton(self.allplots_top,
                                                text='Globally filter dates',
                                                var=self.date_filter_val,
                                                command=self.set_date_filter_state)
-        self.dfilter_s_label = tk.Label(self.allplot_settings,
+        self.dfilter_s_label = tk.Label(self.allplots_top,
                                         text='Start date/time')
-        self.dfilter_e_label = tk.Label(self.allplot_settings,
+        self.dfilter_e_label = tk.Label(self.allplots_top,
                                         text='End date/time')
-        self.dfilter_s_date = DateEntry(self.allplot_settings, width=10)
-        self.dfilter_e_date = DateEntry(self.allplot_settings, width=10)
-        self.dfilter_s_hour = ttk.Combobox(self.allplot_settings,
-                                           values=times,
+        self.dfilter_s_date = DateEntry(self.allplots_top, width=10)
+        self.dfilter_e_date = DateEntry(self.allplots_top, width=10)
+        self.dfilter_s_hour = ttk.Combobox(self.allplots_top,
+                                           values=self.times,
                                            width=10)
-        self.dfilter_e_hour = ttk.Combobox(self.allplot_settings,
-                                           values=times,
+        self.dfilter_e_hour = ttk.Combobox(self.allplots_top,
+                                           values=self.times,
                                            width=10)
         self.dfilter_s_hour.set('noon')
         self.dfilter_e_hour.set('noon')
         self.shade_dark_val = tk.BooleanVar()
         self.shade_dark_val.set(True)
-        self.shade_dark_box = ttk.Checkbutton(self.allplot_settings,
+        self.shade_dark_box = ttk.Checkbutton(self.allplots_top,
                                               variable=self.shade_dark_val,
                                               text='Shade dark periods (set light cycle under General Settings)')
         self.date_filter_box.grid(row=0, column=0, sticky='w', padx=20, pady=5)
         self.dfilter_s_label.grid(row=1, column=0, sticky='w', padx=40)
-        self.dfilter_s_date.grid(row=1, column=1, sticky='nsew')
-        self.dfilter_s_hour.grid(row=1, column=2, sticky='nsew')
+        self.dfilter_s_date.grid(row=1, column=1, sticky='nsw')
+        self.dfilter_s_hour.grid(row=1, column=2, sticky='nsw')
         self.dfilter_e_label.grid(row=2, column=0, sticky='w', padx=40)
-        self.dfilter_e_date.grid(row=2, column=1, sticky='nsew')
-        self.dfilter_e_hour.grid(row=2, column=2, sticky='nsew')
+        self.dfilter_e_date.grid(row=2, column=1, sticky='nsw')
+        self.dfilter_e_hour.grid(row=2, column=2, sticky='nsw')
         self.shade_dark_box.grid(row=3, column=0, sticky='w', padx=20, pady=5)
+
+
+        self.contentselect = ttk.Treeview(self.contentselect_frame, height=8,
+                                          columns=['Contents'])
+        self.contentselect.column('Contents', width=230)
+        self.contentselect.heading(0, text='Contents')
+        self.contentselect['show'] = 'headings'
+        self.contentselect_scroll = ttk.Scrollbar(self.contentselect_frame,
+                                                  command=self.contentselect.yview,)
+        self.contentselect.configure(yscrollcommand=self.contentselect_scroll.set)
+
+        p1 = 'All the liquids assigned to the loaded Sippers will show up here. '
+        p2 = 'Contents selected here will be used in plots when the '
+        p3 = '"Show selected contents" box is ticked for any given plot.'
+        text = p1 + p2 + p3
+        self.contentselect_text = tk.Label(self.contentselect_frame,
+                                           text=text, justify='left',
+                                           wraplength=300)
+        self.contentselect.grid(row=0, column=0, sticky='nsw', padx=(20,0))
+        self.contentselect_scroll.grid(row=0, column=1, sticky='nsw')
+        self.contentselect_text.grid(row=0, column=2, sticky='new', padx=20)
 
         # drink count
         self.drinkcount_settings = tk.Frame(self.plot_settings_window)
         self.plot_settings_tabs.add(self.drinkcount_settings,
                                     text='Drink Count Plots')
+        self.dc_contents_list = tk.Listbox(self.drinkcount_settings)
         self.dc_showleft_val = tk.BooleanVar()
         self.dc_showleft_val.set(True)
         self.dc_showleft_box = tk.Checkbutton(self.drinkcount_settings,
@@ -132,9 +181,15 @@ class SipperViz(tk.Tk):
         self.dc_showright_box = tk.Checkbutton(self.drinkcount_settings,
                                                variable=self.dc_showright_val,
                                                text='Show right sipper')
+        self.dc_showcontent_val = tk.BooleanVar()
+        self.dc_showcontent_val.set(True)
+        self.dc_showcontent_box = tk.Checkbutton(self.drinkcount_settings,
+                                                 variable=self.dc_showcontent_val,
+                                                 text='Show contents (see All Plots tab)')
 
-        self.dc_showleft_box.grid(row=0, column=0, sticky='w', padx=20, pady=5)
-        self.dc_showright_box.grid(row=1, column=0, sticky='w', padx=20, pady=5)
+        self.dc_showleft_box.grid(row=0, column=1, sticky='w', padx=20, pady=5)
+        self.dc_showright_box.grid(row=1, column=1, sticky='w', padx=20, pady=5)
+        self.dc_showcontent_box.grid(row=2, column=1, sticky='w', padx=20, pady=5)
 
     #---create general settings window
         self.general_settings = tk.Toplevel(self)
@@ -147,10 +202,10 @@ class SipperViz(tk.Tk):
         self.lightson_label = tk.Label(self.general_settings, text='Lights on')
         self.lightsoff_label = tk.Label(self.general_settings, text='Lights off')
         self.lightson_menu = ttk.Combobox(self.general_settings, width=10,
-                                          values=times)
+                                          values=self.times)
         self.lightson_menu.set('7 am')
         self.lightsoff_menu = ttk.Combobox(self.general_settings, width=10,
-                                           values=times)
+                                           values=self.times)
         self.lightsoff_menu.set('7 pm')
         self.lightson_label.grid(row=0, column=0, sticky='nsw', padx=20)
         self.lightson_menu.grid(row=0,column=1, sticky='nsew', padx=20)
@@ -166,53 +221,60 @@ class SipperViz(tk.Tk):
                                       self.close_content_window)
 
     #---widgets for assign contents window
+        self.assign_frame1 = tk.Frame(self.contents_window)
         s1 = 'Enter start and end times for left and right bottle contents.'
         s2 = 'Contents will be assigned to Sippers currently selected in the file view,'
         s3 = 'and they will be assigned in order from top to bottom.'
         intro = ' '.join([s1, s2, s3])
-        self.contents_intro = tk.Label(self.contents_window, text=intro,
+        self.contents_intro = tk.Label(self.assign_frame1, text=intro,
                                        wraplength=800, justify='left')
-        self.sdate_label = tk.Label(self.contents_window, text='Start date')
-        self.shour_label = tk.Label(self.contents_window, text='Start hour')
-        self.edate_label = tk.Label(self.contents_window, text='End date')
-        self.ehour_label = tk.Label(self.contents_window, text='End hour')
-        self.lcontent_label = tk.Label(self.contents_window,
+        self.assign_frame2 = tk.Frame(self.contents_window)
+        self.sdate_label = tk.Label(self.assign_frame2, text='Start date')
+        self.shour_label = tk.Label(self.assign_frame2, text='Start hour')
+        self.edate_label = tk.Label(self.assign_frame2, text='End date')
+        self.ehour_label = tk.Label(self.assign_frame2, text='End hour')
+        self.lcontent_label = tk.Label(self.assign_frame2,
                                        text='Left bottle content')
-        self.rcontent_label = tk.Label(self.contents_window,
+        self.rcontent_label = tk.Label(self.assign_frame2,
                                        text='Right bottle content')
-        self.sdate_entry = DateEntry(self.contents_window, width=10)
-        self.shour_entry = ttk.Combobox(self.contents_window, width=10,
-                                        values=times)
+        self.sdate_entry = DateEntry(self.assign_frame2, width=10)
+        self.shour_entry = ttk.Combobox(self.assign_frame2, width=10,
+                                        values=self.times)
         self.shour_entry.set('noon')
-        self.edate_entry = DateEntry(self.contents_window, width=10)
-        self.ehour_entry = ttk.Combobox(self.contents_window, width=10,
-                                        values=times)
+        self.edate_entry = DateEntry(self.assign_frame2, width=10)
+        self.ehour_entry = ttk.Combobox(self.assign_frame2, width=10,
+                                        values=self.times)
         self.ehour_entry.set('noon')
         self.lcontent_val = tk.StringVar()
         self.lcontent_val.set('')
         self.lcontent_val.trace_add('write', self.update_content_buttons)
-        self.lcontent_entry = tk.Entry(self.contents_window, width=10,
+        self.lcontent_entry = tk.Entry(self.assign_frame2, width=10,
                                        textvariable=self.lcontent_val)
         self.rcontent_val = tk.StringVar()
         self.rcontent_val.set('')
         self.rcontent_val.trace_add('write', self.update_content_buttons)
-        self.rcontent_entry = tk.Entry(self.contents_window, width=10,
+        self.rcontent_entry = tk.Entry(self.assign_frame2, width=10,
                                        textvariable=self.rcontent_val)
+        self.swapcontent = tk.Button(self.assign_frame2,
+                                     image=self.icons['swap'],
+                                     command=self.swapcontents,
+                                     width=20)
         labels = ['Start', 'End', 'Left', 'Right']
         self.assign_content_view = ttk.Treeview(self.contents_window,
                                                 columns=labels,
                                                 selectmode='browse')
-        self.content_add = tk.Button(self.contents_window, text='Add',
+        self.assign_frame4 = tk.Frame(self.contents_window)
+        self.content_add = tk.Button(self.assign_frame4, text='Add',
                                      command=self.add_content)
-        self.content_delete = tk.Button(self.contents_window, text='Delete',
+        self.content_delete = tk.Button(self.assign_frame4, text='Delete',
                                         command=self.delete_content)
-        self.content_moveup = tk.Button(self.contents_window, text='Move Up',
+        self.content_moveup = tk.Button(self.assign_frame4, text='Move Up',
                                         command=lambda b=-1: self.move_content(b))
-        self.content_movedown = tk.Button(self.contents_window, text='Move Down',
+        self.content_movedown = tk.Button(self.assign_frame4, text='Move Down',
                                           command=lambda b=1: self.move_content(b))
-        self.content_assign = tk.Button(self.contents_window, text='Assign',
+        self.content_assign = tk.Button(self.assign_frame4, text='Assign',
                                         command=self.assign_content)
-        self.content_cancel = tk.Button(self.contents_window, text="Cancel",
+        self.content_cancel = tk.Button(self.assign_frame4, text="Cancel",
                                         command=self.close_content_window)
 
         for i, name in enumerate(labels):
@@ -221,30 +283,33 @@ class SipperViz(tk.Tk):
         self.assign_content_view['show'] = 'headings'
         self.assign_content_view.bind('<<TreeviewSelect>>',
                                       self.update_content_buttons)
-        c = 6
-        h  = int(c/2)
-        self.contents_intro.grid(row=0, column=0, sticky='nsw', columnspan=c,
-                                 pady=(30,20), padx=30)
-        self.sdate_label.grid(row=1, column=0, sticky='w', padx=20, columnspan=h)
-        self.sdate_entry.grid(row=1, column=2, sticky='nsw', columnspan=h)
-        self.shour_label.grid(row=2, column=0, sticky='w', padx=20, columnspan=h)
-        self.shour_entry.grid(row=2, column=2, sticky='nsw', columnspan=h)
-        self.edate_label.grid(row=3, column=0, sticky='w', padx=20, columnspan=h)
-        self.edate_entry.grid(row=3, column=2, sticky='nsw', columnspan=h)
-        self.ehour_label.grid(row=4, column=0, sticky='w', padx=20, columnspan=h)
-        self.ehour_entry.grid(row=4, column=2, sticky='nsw', columnspan=h)
-        self.lcontent_label.grid(row=5, column=0, sticky='w', padx=20, columnspan=h)
-        self.lcontent_entry.grid(row=5, column=2, sticky='nsw', columnspan=h)
-        self.rcontent_label.grid(row=6, column=0, sticky='w', padx=20, columnspan=h)
-        self.rcontent_entry.grid(row=6, column=2, sticky='nsw', columnspan=h)
-        self.assign_content_view.grid(row=7, column=0, sticky='nsew',
-                                      columnspan=c, pady=(30,0))
-        self.content_add.grid(row=8, column=0, sticky='nsew', padx=10, pady=5)
-        self.content_delete.grid(row=8, column=1, sticky='nsew', padx=10, pady=5)
-        self.content_moveup.grid(row=8, column=2, sticky='nsew', padx=10, pady=5)
-        self.content_movedown.grid(row=8, column=3, sticky='nsew', padx=10, pady=5)
-        self.content_assign.grid(row=8, column=4, sticky='nsew', padx=10, pady=5)
-        self.content_cancel.grid(row=8, column=5, sticky='nsew', padx=10, pady=5)
+
+        self.assign_frame1.grid(row=1, column=0, sticky='nsew')
+        self.assign_frame2.grid(row=2, column=0, sticky='nsew')
+        self.assign_content_view.grid(row=3, column=0, sticky='nsew', pady=(30,0))
+        self.assign_frame4.grid(row=4, column=0, sticky='nsew')
+        self.contents_intro.grid(row=0, column=0, sticky='nsew', pady=(30,20), padx=30)
+        self.sdate_label.grid(row=1, column=0, sticky='w', padx=20)
+        self.sdate_entry.grid(row=1, column=2, sticky='nsw')
+        self.shour_label.grid(row=2, column=0, sticky='w', padx=20)
+        self.shour_entry.grid(row=2, column=2, sticky='nsw')
+        self.edate_label.grid(row=3, column=0, sticky='w', padx=20)
+        self.edate_entry.grid(row=3, column=2, sticky='nsw')
+        self.ehour_label.grid(row=4, column=0, sticky='w', padx=20)
+        self.ehour_entry.grid(row=4, column=2, sticky='nsw')
+        self.lcontent_label.grid(row=5, column=0, sticky='w', padx=20)
+        self.lcontent_entry.grid(row=5, column=2, sticky='nsew')
+        self.rcontent_label.grid(row=6, column=0, sticky='w', padx=20)
+        self.rcontent_entry.grid(row=6, column=2, sticky='nsew')
+        self.swapcontent.grid(row=5, column=3, sticky='nsw', rowspan=2, padx=20)
+        self.content_add.grid(row=0, column=0, sticky='nsew', padx=10, pady=5)
+        self.content_delete.grid(row=0, column=1, sticky='nsew', padx=10, pady=5)
+        self.content_moveup.grid(row=0, column=2, sticky='nsew', padx=10, pady=5)
+        self.content_movedown.grid(row=0, column=3, sticky='nsew', padx=10, pady=5)
+        self.content_assign.grid(row=0, column=4, sticky='nsew', padx=10, pady=5)
+        self.content_cancel.grid(row=0, column=5, sticky='nsew', padx=10, pady=5)
+        for i in range(6):
+            self.assign_frame4.columnconfigure(i, weight=1)
 
     #---create treeview panes (left sash)
         self.left_sash = ttk.PanedWindow(self.main_frame, orient='vertical')
@@ -262,25 +327,6 @@ class SipperViz(tk.Tk):
         self.plotmenu.add_command(label='Drink Count (Cumulative)', command=lambda:
                                   self.iter_plot(sipperplots.drinkcount_cumulative))
         self.menubar.add_cascade(menu=self.plotmenu, label='Plot')
-
-    #---load button images
-        icons = {'gear':"img/settings_icon.gif",
-                 'bottle':'img/bottle_icon.png',
-                 'delete_bottle':'img/delete_bottle.png',
-                 'tack':'img/tack.png',
-                 'paperclip':'img/paperclip.png',
-                 'save':'img/save.png',
-                 'script':'img/script.png',
-                 'spreadsheet':'img/spreadsheet.png',
-                 'graph':'img/graph.png',
-                 'delete_graph':'img/delete_graph.png',
-                 'picture':'img/picture.png',
-                 'palette':'img/palette.png',
-                 'drop':'img/drop.png'}
-        self.icons = {}
-        for k, v in icons.items():
-            image = Image.open(v).resize((25, 25))
-            self.icons[k] = ImageTk.PhotoImage(image)
 
     #---create buttons
         self.button_frame = tk.Frame(self.main_frame)
@@ -498,12 +544,14 @@ class SipperViz(tk.Tk):
                     tb = traceback.format_exc()
                     print(tb)
             self.update_file_view()
+            self.update_avail_contents()
 
     def delete_files(self):
         selected = [int(i) for i in self.file_view.selection()]
         for index in sorted(selected, reverse=True):
             del(self.loaded_sippers[index])
         self.update_file_view()
+        self.update_avail_contents()
 
     def save_files(self):
         selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
@@ -671,6 +719,22 @@ class SipperViz(tk.Tk):
     #---content window functions
     def raise_content_window(self):
         self.assign_content_view.delete(*self.assign_content_view.get_children())
+        selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+        mindate = dt.datetime(2999, 12, 13)
+        maxdate = dt.datetime(1970, 1, 1)
+        for s in selected:
+            if s.start_date < mindate:
+                mindate = s.start_date
+            if s.end_date > maxdate:
+                maxdate = s.end_date
+        shour = mindate.hour
+        ehour = maxdate.hour
+        sdate = mindate.date()
+        edate = maxdate.date()
+        self.sdate_entry.set_date(sdate)
+        self.edate_entry.set_date(edate)
+        self.shour_entry.set(self.times[shour])
+        self.ehour_entry.set(self.times[ehour])
         self.contents_window.deiconify()
         self.contents_window.grab_set()
         self.update_content_buttons()
@@ -726,8 +790,9 @@ class SipperViz(tk.Tk):
         if files:
             for f in files:
                 f.assign_contents(d)
-        self.contents_window.withdraw()
+        self.close_content_window()
         self.display_details()
+        self.update_avail_contents()
 
     def update_content_buttons(self, *event):
         entries = self.assign_content_view.get_children()
@@ -753,6 +818,33 @@ class SipperViz(tk.Tk):
         self.contents_window.grab_release()
         self.grab_set()
         self.contents_window.withdraw()
+
+    def swapcontents(self):
+        lcontent = self.lcontent_val.get()
+        rcontent = self.rcontent_val.get()
+        self.lcontent_val.set(rcontent)
+        self.rcontent_val.set(lcontent)
+
+    def update_avail_contents(self):
+        for s in self.loaded_sippers:
+            for c in s.contents:
+                if c not in self.avail_contents:
+                    self.avail_contents.append(c)
+        self.avail_contents.sort()
+        self.update_contentselect()
+
+    def update_contentselect(self):
+        current = self.contentselect.selection()
+        total = self.contentselect.get_children()
+        self.contentselect.delete(*self.contentselect.get_children())
+        for i, c in enumerate(self.avail_contents):
+            self.contentselect.insert('','end',iid=c,values=[c])
+            if c in current:
+                self.contentselect.selection_add(c)
+            elif c in total and c not in current:
+                pass
+            else:
+                self.contentselect.selection_add(c)
 
     #---errors
     def raise_dfilter_error(self):
