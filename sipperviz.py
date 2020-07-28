@@ -56,7 +56,8 @@ class SipperViz(tk.Tk):
                               'lights_on': 'lights on',
                               'lights_off': 'lights off',
                               'show_left_count': 'show left',
-                              'show_right_count': 'show right'}
+                              'show_right_count': 'show right',
+                              'show_content_count': 'content'}
 
     #---data management
         self.loaded_sippers = []
@@ -653,11 +654,16 @@ class SipperViz(tk.Tk):
     def get_argument_settings_dict(self):
         lon = self.times_to_int[self.lightson_menu.get()]
         loff = self.times_to_int[self.lightsoff_menu.get()]
+        if self.dc_showcontent_val.get():
+            dc_content = list(self.contentselect.selection())
+        else:
+            dc_content = []
         settings_dict = {'shade_dark':self.shade_dark_val.get(),
                          'show_left_count':self.dc_showleft_val.get(),
                          'show_right_count':self.dc_showright_val.get(),
                          'lights_on':lon,
-                         'lights_off':loff}
+                         'lights_off':loff,
+                         'show_content_count':dc_content}
         return settings_dict
 
     def get_all_settings_df(self):
@@ -826,6 +832,7 @@ class SipperViz(tk.Tk):
         self.rcontent_val.set(lcontent)
 
     def update_avail_contents(self):
+        self.avail_contents = []
         for s in self.loaded_sippers:
             for c in s.contents:
                 if c not in self.avail_contents:

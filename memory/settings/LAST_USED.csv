@@ -4,6 +4,7 @@ show_left_count,True
 show_right_count,True
 lights_on,7
 lights_off,19
+show_content_count,"['Mountain Dew', 'Water']"
 dfilter_val,False
 dfilter_sdate,2020-07-27
 dfilter_edate,2020-07-27
