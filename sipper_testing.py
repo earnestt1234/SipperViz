@@ -17,6 +17,8 @@ s.assign_contents({(t1,t2):("Water","Oxy"),
                    (t2,t3):("Oxy","Water"),
                    (t3,t4):('Water',"Oxy")})
 d = s.data
-o = s.get_content_values('Oxy', 'Count')
 
-sipperplots.drinkcount_cumulative(s, show_content_count=['Oxy'])
+t = sipper.Sipper(path2)
+g = t.data
+
+o = sipper.sipper_concat([s,t])

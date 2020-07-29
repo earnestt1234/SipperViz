@@ -364,7 +364,7 @@ class SipperViz(tk.Tk):
                                        image=self.icons['tack'],
                                        text='Concat', compound='top',
                                        borderwidth=0,
-                                       command=print,
+                                       command=self.concat_files,
                                        width=40)
         self.assign_button = tk.Button(self.button_frame,
                                        image=self.icons['drop'],
@@ -540,6 +540,13 @@ class SipperViz(tk.Tk):
         self.right_sash.add(self.plot_info_frame)
 
     #---operations pre opening
+        last_settings = 'memory/settings/LAST_USED.CSV'
+        if os.path.isfile(last_settings):
+            self.load_settings_df(last_settings)
+            # try:
+            #     self.load_settings_df(last_settings)
+            # except:
+            #     print('Found LAST_USED settings but unable to load!')
         self.set_date_filter_state()
 
     #---file functions
@@ -583,6 +590,24 @@ class SipperViz(tk.Tk):
                     savepath = os.path.join(folder, s.basename)
                     savepath = self.create_file_name(savepath)
                     s.data.to_csv(savepath)
+
+    def concat_files(self):
+        selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+        try:
+            new = sipper.sipper_concat(selected)
+            savepath = tk.filedialog.asksaveasfilename(title='Save concatenated file',
+                                                       defaultextension='.csv',
+                                                       filetypes=[('Comma-Separated Values', '*.csv')])
+            if savepath:
+                new.to_csv(savepath)
+                new_file = sipper.Sipper(savepath)
+                self.loaded_sippers.append(new_file)
+                for s in selected:
+                    self.loaded_sippers.remove(s)
+                self.update_file_view()
+        except sipper.SipperError:
+            print('cant concat, add popup')
+
 
     def update_file_view(self):
         self.file_view.delete(*self.file_view.get_children())
@@ -686,7 +711,7 @@ class SipperViz(tk.Tk):
         d['dfilter_edate'] = self.dfilter_e_date.get_date()
         d['dfilter_shour'] = self.times_to_int[self.dfilter_s_hour.get()]
         d['dfilter_ehour'] = self.times_to_int[self.dfilter_e_hour.get()]
-        d['show_content_val'] = self.show_content_val.get()
+        d['show_content_val'] = self.drink_showcontent_val.get()
         settings_df = pd.DataFrame(columns=['Value'])
         for k, v in d.items():
             settings_df.loc[k, 'Value'] = v
@@ -701,14 +726,31 @@ class SipperViz(tk.Tk):
                                                   filetypes=[('Comma-Separated Values', '*.csv')],
                                                   initialdir='memory/settings')
         if path:
-            df = pd.read_csv(path)
+            df = pd.read_csv(path, index_col=0)
             v = 'Value'
             self.shade_dark_val.set(df.loc['shade_dark', v])
-            self.lightson_menu.set(df.loc['lights_on', v])
-            self.lightsoff_menu.set(df.loc['lights_off', v])
+            self.lightson_menu.set(self.times[int(df.loc['lights_on', v])])
+            self.lightsoff_menu.set(self.times[int(df.loc['lights_off', v])])
             self.drink_showleft_val.set(df.loc['show_left', v])
             self.drink_showright_val.set(df.loc['show_right', v])
-            self.show_content_val.set(df.loc['show_content_val', v])
+            self.drink_showcontent_val.set(df.loc['show_content_val', v])
+            s = pd.to_datetime(df.loc['dfilter_sdate', v])
+            e = pd.to_datetime(df.loc['dfilter_edate', v])
+            if str(self.dfilter_s_date.cget('state')) == 'disabled':
+                self.dfilter_s_date.configure(state='normal')
+                self.dfilter_s_date.set_date(s)
+                self.dfilter_s_date.configure(state='disabled')
+            else:
+                self.dfilter_s_date.set_date(s)
+            if str(self.dfilter_e_date.cget('state')) == 'disabled':
+                self.dfilter_e_date.configure(state='normal')
+                self.dfilter_e_date.set_date(e)
+                self.dfilter_e_date.configure(state='disabled')
+            else:
+                self.dfilter_e_date.set_date(e)
+            self.dfilter_s_hour.set(self.times[int(df.loc['dfilter_shour', v])])
+            self.dfilter_e_hour.set(self.times[int(df.loc['dfilter_ehour', v])])
+
 
     def set_date_filter_state(self):
         if self.date_filter_val.get():

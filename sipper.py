@@ -31,22 +31,65 @@ def groupby_convertcontent(gr, content, out='Count'):
     output = pd.concat(output)
     return output - np.nanmin(output)
 
+def is_concatable(sippers):
+    """
+    Determines whether or not Sipper files can be concatenated,
+    (based on whether their start and end times overlap).
+
+    Parameters
+    ----------
+    sippers : array
+        an array of Sipper files
+
+    Returns
+    -------
+    bool
+
+    """
+    sorted_sips = sorted(sippers, key=lambda x: x.start_date)
+    for i, file in enumerate(sorted_sips[1:], start=1):
+        if file.start_date <= sorted_sips[i-1].end_date:
+            return False
+    return True
+
+def sipper_concat(sippers):
+    if not is_concatable(sippers):
+        raise SipperError('File dates overlap; cannot concatenate')
+    output=[]
+    columns = ['Elapsed Time', 'Device', 'LeftCount', 'LeftDuration',
+               'RightCount', 'RightDuration', 'BatteryVoltage',
+               'LeftContents', 'RightContents']
+    offsets = {}
+    sorted_sippers = sorted(sippers, key=lambda x: x.start_date)
+    for i, s in enumerate(sorted_sippers):
+        df = s.data.copy().loc[:,columns]
+        if i==0:
+            output.append(df)
+            for col in['LeftCount', 'LeftDuration',
+                       'RightCount', 'RightDuration']:
+                if col in df.columns:
+                    offsets[col] = df[col].max()
+        else:
+            for name, offset in offsets.items():
+                df[name] += offset
+                offsets[name] = df[name].max()
+            output.append(df)
+    output = pd.concat(output)
+    return output
+
 class Sipper():
     def __init__(self, path):
         self.path = path
         try:
             self.data = pd.read_csv(path)
             self.data.columns = self.data.columns.str.strip()
-            passed = False
             og_columns = ['MM:DD:YYYY hh:mm:ss', 'Elapsed Time', 'Device',
                           'LeftCount', 'LeftDuration', 'RightCount',
                           'RightDuration', 'BatteryVoltage']
-            sipviz_columns = og_columns[:-1] + ['LeftContents', 'RightContents']
+            sipviz_columns = og_columns + ['LeftContents', 'RightContents']
             if list(self.data.columns) == og_columns:
-                passed = True
                 self.version = 'Raw'
             elif list(self.data.columns) == sipviz_columns:
-                passed = True
                 self.version = 'SipperViz'
             else:
                 raise SipperError('Column names do not match sipper data')
@@ -56,11 +99,8 @@ class Sipper():
             raise error
 
         #data editing and attributes
-        if 'BatteryVoltage' in self.data.columns:
-            self.battery = self.data['BatteryVoltage']
-            self.data.drop(['BatteryVoltage'], axis=1, inplace=True)
-        else:
-            self.battery = None
+        # keep battery before dropping duplicates
+        self.battery = self.data['BatteryVoltage']
         self.data.drop_duplicates(subset=['LeftCount','LeftDuration',
                                           'RightCount','RightDuration'],
                                   inplace=True)
@@ -76,7 +116,10 @@ class Sipper():
         #informational attributes
         self.basename = os.path.basename(path)
         self.filename, self.extension = os.path.splitext(self.basename)
-        self.device_no = self.data['Device'][0]
+        if len(set(self.data['Device'])) == 1:
+            self.device_no = self.data['Device'][0]
+        else:
+            self.device_no = None
         self.left_name = 'Left'
         self.right_name = 'Right'
         self.end_date = self.data.index[-1]
