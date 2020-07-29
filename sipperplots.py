@@ -274,8 +274,8 @@ def date_format_x(ax, start, end):
     ax.xaxis.set_major_formatter(xfmt)
     ax.xaxis.set_minor_locator(minor)
 
-def drinkcount_cumulative(sipper, show_left_count=True, show_right_count=True,
-                          shade_dark=True, show_content_count=[],
+def drinkcount_cumulative(sipper, show_left=True, show_right=True,
+                          show_content=[], shade_dark=True,
                           lights_on=7, lights_off=19, **kwargs):
     if 'ax' in kwargs:
         ax = kwargs['ax']
@@ -286,20 +286,53 @@ def drinkcount_cumulative(sipper, show_left_count=True, show_right_count=True,
         s, e = kwargs['date_filter']
         df = df[(df.index >= s) &
                 (df.index <= e)].copy()
-    if show_left_count:
+    if show_left:
         ax.plot(df.index, df['LeftCount'], drawstyle='steps', color='red',
                 label=sipper.left_name)
-    if show_right_count:
+    if show_right:
         ax.plot(df.index, df['RightCount'], drawstyle='steps', color='blue',
                 label=sipper.right_name)
-    if show_content_count:
-        for c in show_content_count:
+    if show_content:
+        for c in show_content:
             count = sipper.get_content_values(c, out='Count', df=sipper.data)
             if not count.empty:
                 ax.plot(count.index, count, drawstyle='steps', label=c)
     date_format_x(ax, df.index[0], df.index[-1])
     ax.set_title('Drink Count for ' + sipper.filename)
-    ax.set_ylabel('Drinks')
+    ax.set_ylabel('Total Drinks')
+    ax.set_xlabel('Date')
+    if shade_dark:
+        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
+def drinkduration_cumulative(sipper, show_left=True, show_right=True,
+                             show_content=[], shade_dark=True,
+                             lights_on=7, lights_off=19, **kwargs):
+    if 'ax' in kwargs:
+        ax = kwargs['ax']
+    else:
+        fig, ax = plt.subplots()
+    df = sipper.data
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    if show_left:
+        ax.plot(df.index, df['LeftDuration'], drawstyle='steps', color='red',
+                label=sipper.left_name)
+    if show_right:
+        ax.plot(df.index, df['RightDuration'], drawstyle='steps', color='blue',
+                label=sipper.right_name)
+    if show_content:
+        for c in show_content:
+            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            if not count.empty:
+                ax.plot(count.index, count, drawstyle='steps', label=c)
+    date_format_x(ax, df.index[0], df.index[-1])
+    ax.set_title('Drink Duration for ' + sipper.filename)
+    ax.set_ylabel('Total Drink Duration (s)')
     ax.set_xlabel('Date')
     if shade_dark:
         shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)

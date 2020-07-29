@@ -1,12 +1,12 @@
 ,Value
 shade_dark,True
-show_left_count,True
-show_right_count,True
+show_left,True
+show_right,True
 lights_on,7
 lights_off,19
-show_content_count,"['Mountain Dew', 'Water']"
+show_content,[]
 dfilter_val,False
-dfilter_sdate,2020-07-27
-dfilter_edate,2020-07-27
+dfilter_sdate,2020-07-29
+dfilter_edate,2020-07-29
 dfilter_shour,12
 dfilter_ehour,12

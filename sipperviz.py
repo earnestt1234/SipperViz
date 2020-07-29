@@ -51,13 +51,15 @@ class SipperViz(tk.Tk):
 
         self.times_to_int = {time : num for num,time in enumerate(self.times)}
         self.plot_default_names = {sipperplots.drinkcount_cumulative:
-                                   'Drink Count (Cumulative)'}
+                                   'Drink Count (Cumulative)',
+                                   sipperplots.drinkduration_cumulative:
+                                   'Drink Duration (Cumulative)'}
         self.args_to_names = {'shade_dark':'shade dark',
                               'lights_on': 'lights on',
                               'lights_off': 'lights off',
-                              'show_left_count': 'show left',
-                              'show_right_count': 'show right',
-                              'show_content_count': 'content'}
+                              'show_left': 'show left',
+                              'show_right': 'show right',
+                              'show_content': 'content'}
 
     #---data management
         self.loaded_sippers = []
@@ -106,11 +108,8 @@ class SipperViz(tk.Tk):
         # all plots
         self.allplot_settings = tk.Frame(self.plot_settings_window)
         self.plot_settings_tabs.add(self.allplot_settings, text='All Plots')
-
         self.allplots_top = tk.Frame(self.allplot_settings)
-        self.contentselect_frame = tk.Frame(self.allplot_settings)
         self.allplots_top.grid(row=0, column=0, sticky='nsew')
-        self.contentselect_frame.grid(row=1, column=0, sticky='nsew', pady=40)
 
         self.date_filter_val = tk.BooleanVar()
         self.date_filter_val.set(False)
@@ -146,7 +145,11 @@ class SipperViz(tk.Tk):
         self.dfilter_e_hour.grid(row=2, column=2, sticky='nsw')
         self.shade_dark_box.grid(row=3, column=0, sticky='w', padx=20, pady=5)
 
-
+        # content
+        self.contentselect_tab = tk.Frame(self.plot_settings_window)
+        self.plot_settings_tabs.add(self.contentselect_tab, text='Contents')
+        self.contentselect_frame = tk.Frame(self.contentselect_tab)
+        self.contentselect_frame.grid(row=0, column=0, sticky='nsew', padx=20, pady=20)
         self.contentselect = ttk.Treeview(self.contentselect_frame, height=8,
                                           columns=['Contents'])
         self.contentselect.column('Contents', width=230)
@@ -167,30 +170,36 @@ class SipperViz(tk.Tk):
         self.contentselect_scroll.grid(row=0, column=1, sticky='nsw')
         self.contentselect_text.grid(row=0, column=2, sticky='new', padx=20)
 
-        # drink count
-        self.drinkcount_settings = tk.Frame(self.plot_settings_window)
-        self.plot_settings_tabs.add(self.drinkcount_settings,
-                                    text='Drink Count Plots')
-        self.dc_contents_list = tk.Listbox(self.drinkcount_settings)
-        self.dc_showleft_val = tk.BooleanVar()
-        self.dc_showleft_val.set(True)
-        self.dc_showleft_box = tk.Checkbutton(self.drinkcount_settings,
-                                              variable=self.dc_showleft_val,
+        # drinks
+        self.drink_settings = tk.Frame(self.plot_settings_window)
+        self.plot_settings_tabs.add(self.drink_settings,
+                                    text='Drink Plots')
+        s1 = 'The following settings affect the Drink Count (Cumulative), '
+        s2 = 'Drink Count (Binned), Drink Duration (Cumulative), and '
+        s3 = 'Drink Duration (Binned) plots.'
+        text = s1 + s2 + s3
+        self.drink_settings_label = tk.Label(self.drink_settings, text=text,
+                                            wraplength=600, justify='left')
+        self.drink_showleft_val = tk.BooleanVar()
+        self.drink_showleft_val.set(True)
+        self.drink_showleft_box = tk.Checkbutton(self.drink_settings,
+                                              variable=self.drink_showleft_val,
                                               text='Show left sipper')
-        self.dc_showright_val = tk.BooleanVar()
-        self.dc_showright_val.set(True)
-        self.dc_showright_box = tk.Checkbutton(self.drinkcount_settings,
-                                               variable=self.dc_showright_val,
+        self.drink_showright_val = tk.BooleanVar()
+        self.drink_showright_val.set(True)
+        self.drink_showright_box = tk.Checkbutton(self.drink_settings,
+                                               variable=self.drink_showright_val,
                                                text='Show right sipper')
-        self.dc_showcontent_val = tk.BooleanVar()
-        self.dc_showcontent_val.set(True)
-        self.dc_showcontent_box = tk.Checkbutton(self.drinkcount_settings,
-                                                 variable=self.dc_showcontent_val,
-                                                 text='Show contents (see All Plots tab)')
+        self.drink_showcontent_val = tk.BooleanVar()
+        self.drink_showcontent_val.set(True)
+        self.drink_showcontent_box = tk.Checkbutton(self.drink_settings,
+                                                 variable=self.drink_showcontent_val,
+                                                 text='Show contents (see Content tab)')
 
-        self.dc_showleft_box.grid(row=0, column=1, sticky='w', padx=20, pady=5)
-        self.dc_showright_box.grid(row=1, column=1, sticky='w', padx=20, pady=5)
-        self.dc_showcontent_box.grid(row=2, column=1, sticky='w', padx=20, pady=5)
+        self.drink_settings_label.grid(row=0, column=1, sticky='nsew', padx=20, pady=5)
+        self.drink_showleft_box.grid(row=1, column=1, sticky='w', padx=20, pady=5)
+        self.drink_showright_box.grid(row=2, column=1, sticky='w', padx=20, pady=5)
+        self.drink_showcontent_box.grid(row=3, column=1, sticky='w', padx=20, pady=5)
 
     #---create general settings window
         self.general_settings = tk.Toplevel(self)
@@ -318,7 +327,7 @@ class SipperViz(tk.Tk):
     #---create plot panes (right sash)
         self.right_sash = ttk.PanedWindow(self.main_frame, orient='vertical')
 
-    #---create menu
+    #---menu bar
         self.menubar = tk.Menu(self.main_frame)
         self.config(menu=self.menubar)
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
@@ -327,6 +336,8 @@ class SipperViz(tk.Tk):
         self.plotmenu = tk.Menu(self.menubar, tearoff=0)
         self.plotmenu.add_command(label='Drink Count (Cumulative)', command=lambda:
                                   self.iter_plot(sipperplots.drinkcount_cumulative))
+        self.plotmenu.add_command(label='Drink Duration (Cumulative)', command=lambda:
+                                  self.iter_plot(sipperplots.drinkduration_cumulative))
         self.menubar.add_cascade(menu=self.plotmenu, label='Plot')
 
     #---create buttons
@@ -654,16 +665,16 @@ class SipperViz(tk.Tk):
     def get_argument_settings_dict(self):
         lon = self.times_to_int[self.lightson_menu.get()]
         loff = self.times_to_int[self.lightsoff_menu.get()]
-        if self.dc_showcontent_val.get():
-            dc_content = list(self.contentselect.selection())
+        if self.drink_showcontent_val.get():
+            drink_content = list(self.contentselect.selection())
         else:
-            dc_content = []
-        settings_dict = {'shade_dark':self.shade_dark_val.get(),
-                         'show_left_count':self.dc_showleft_val.get(),
-                         'show_right_count':self.dc_showright_val.get(),
-                         'lights_on':lon,
-                         'lights_off':loff,
-                         'show_content_count':dc_content}
+            drink_content = []
+        settings_dict = {'shade_dark'  :self.shade_dark_val.get(),
+                         'lights_on'   :lon,
+                         'lights_off'  :loff,
+                         'show_left'   :self.drink_showleft_val.get(),
+                         'show_right'  :self.drink_showright_val.get(),
+                         'show_content':drink_content}
         return settings_dict
 
     def get_all_settings_df(self):
@@ -675,6 +686,7 @@ class SipperViz(tk.Tk):
         d['dfilter_edate'] = self.dfilter_e_date.get_date()
         d['dfilter_shour'] = self.times_to_int[self.dfilter_s_hour.get()]
         d['dfilter_ehour'] = self.times_to_int[self.dfilter_e_hour.get()]
+        d['show_content_val'] = self.show_content_val.get()
         settings_df = pd.DataFrame(columns=['Value'])
         for k, v in d.items():
             settings_df.loc[k, 'Value'] = v
@@ -682,13 +694,21 @@ class SipperViz(tk.Tk):
 
     def load_settings_df(self, path):
         if os.path.exists(path):
-            settings_df = pd.read_csv(path)
+            pass
         else:
             path = tk.filedialog.askopenfilenames(title='Select FED3 Data',
                                                   defaultextension='.csv',
                                                   filetypes=[('Comma-Separated Values', '*.csv')],
                                                   initialdir='memory/settings')
-
+        if path:
+            df = pd.read_csv(path)
+            v = 'Value'
+            self.shade_dark_val.set(df.loc['shade_dark', v])
+            self.lightson_menu.set(df.loc['lights_on', v])
+            self.lightsoff_menu.set(df.loc['lights_off', v])
+            self.drink_showleft_val.set(df.loc['show_left', v])
+            self.drink_showright_val.set(df.loc['show_right', v])
+            self.show_content_val.set(df.loc['show_content_val', v])
 
     def set_date_filter_state(self):
         if self.date_filter_val.get():
