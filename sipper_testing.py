@@ -21,7 +21,12 @@ d = s.data
 t = sipper.Sipper(path2)
 g = t.data
 
-o = sipper.sipper_concat([s,t])
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+sipperplots.drinkcount_cumulative(s, ax=ax, show_content=['Oxy'])
+output = sipperplots.get_line_data(ax)
+
 #%%
 import tkinter as tk
 from tkinter.font import Font

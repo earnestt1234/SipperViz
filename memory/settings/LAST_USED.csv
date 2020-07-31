@@ -1,7 +1,7 @@
 ,Value
 shade_dark,True
-lights_on,10
-lights_off,12
+lights_on,7
+lights_off,19
 show_left,True
 show_right,True
 show_content,[]

@@ -2,6 +2,7 @@
 
 import datetime
 
+import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
@@ -276,6 +277,8 @@ def date_format_x(ax, start, end):
     ax.xaxis.set_major_formatter(xfmt)
     ax.xaxis.set_minor_locator(minor)
 
+#---plotting functions
+
 def drinkcount_cumulative(sipper, show_left=True, show_right=True,
                           show_content=[], shade_dark=True,
                           lights_on=7, lights_off=19, **kwargs):
@@ -341,3 +344,17 @@ def drinkduration_cumulative(sipper, show_left=True, show_right=True,
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
+
+#---data return functions
+
+def get_line_data(ax):
+    output = pd.DataFrame()
+    lines, labels = ax.get_legend_handles_labels()
+    zipped = zip(lines, labels)
+    for line, label in zipped:
+        if not isinstance(line, mpl.lines.Line2D):
+            continue
+        x, y = line.get_data()
+        temp = pd.DataFrame({label : y}, index=x)
+        output = output.join(temp, how='outer')
+    return output

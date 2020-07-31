@@ -25,6 +25,7 @@ class SipperPlot:
         self.name = name
         self.func = func
         self.args = args
+        self.data = pd.DataFrame()
 
 class SipperViz(tk.Tk):
     """Class for SipViz"""
@@ -55,6 +56,10 @@ class SipperViz(tk.Tk):
                                    'Drink Count (Cumulative)',
                                    sipperplots.drinkduration_cumulative:
                                    'Drink Duration (Cumulative)'}
+        self.get_data_funcs = {sipperplots.drinkcount_cumulative:
+                                   sipperplots.get_line_data,
+                               sipperplots.drinkduration_cumulative:
+                                   sipperplots.get_line_data}
         self.args_to_names = {'shade_dark':'shade dark',
                               'lights_on': 'lights on',
                               'lights_off': 'lights off',
@@ -396,7 +401,7 @@ class SipperViz(tk.Tk):
                                           image=self.icons['spreadsheet'],
                                           text='Data', compound='top',
                                           borderwidth=0,
-                                          command=print,
+                                          command=self.save_plot_data,
                                           width=40)
         self.plot_code_button = tk.Button(self.button_frame,
                                           image=self.icons['script'],
@@ -408,7 +413,7 @@ class SipperViz(tk.Tk):
                                             image=self.icons['delete_graph'],
                                             text='Delete', compound='top',
                                             borderwidth=0,
-                                            command=print,
+                                            command=self.delete_plots,
                                             width=40)
         self.plotopts_button = tk.Button(self.button_frame,
                                          image=self.icons['palette'],
@@ -492,7 +497,7 @@ class SipperViz(tk.Tk):
 
     #---create plotting area
         self.plot_frame = tk.Frame(self.main_frame)
-        self.fig = mpl.figure.Figure(figsize=(10, 6), dpi=100)
+        self.fig = mpl.figure.Figure(figsize=(7, 4), dpi=100)
         self.ax = self.fig.add_subplot()
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
         self.canvas.draw_idle()
@@ -610,7 +615,6 @@ class SipperViz(tk.Tk):
         except sipper.SipperError:
             print('cant concat, add popup')
 
-
     def update_file_view(self):
         self.file_view.delete(*self.file_view.get_children())
         for i, s in enumerate(self.loaded_sippers):
@@ -655,14 +659,17 @@ class SipperViz(tk.Tk):
         if self.bad_date_sippers:
             self.raise_dfilter_error()
 
-    def display_plot(self, plot, new=False):
+    def display_plot(self, plot, new=False, select=True):
         self.suspend_plot_raising = True
-        if new:
-            self.plot_list.selection_remove(self.plot_list.selection())
-            self.plot_list.selection_set(plot.name)
         self.ax.clear()
         self.display_plot_details(plot)
         plot.func(**plot.args)
+        if new:
+            getdata = self.get_data_funcs[plot.func]
+            plot.data = getdata(self.ax)
+        if select:
+            self.plot_list.selection_remove(self.plot_list.selection())
+            self.plot_list.selection_set(plot.name)
         self.canvas.draw_idle()
         self.update()
         self.suspend_plot_raising = False
@@ -691,6 +698,19 @@ class SipperViz(tk.Tk):
             self.plot_info.insert('','end', text='date filter : False')
 
     #---plot button functions
+    def delete_plots(self):
+        selected = self.plot_list.selection()
+        self.plot_list.delete(*selected)
+        for name in selected:
+            del self.loaded_plots[name]
+        if self.plot_list.get_children():
+            lastname = self.plot_list.get_children()[-1]
+            self.display_plot(self.loaded_plots[lastname])
+        else:
+            self.ax.clear()
+            self.canvas.draw_idle()
+            self.update()
+
     def save_plots(self):
         selected = self.plot_list.selection()
         if len(selected) == 1:
@@ -742,6 +762,30 @@ class SipperViz(tk.Tk):
             save_button.grid(row=1,column=0,sticky='w')
             new_window.grid_rowconfigure(0,weight=1)
             new_window.grid_columnconfigure(0,weight=1)
+
+    def save_plot_data(self):
+        selected = self.plot_list.selection()
+        if len(selected) == 1:
+            plot = self.loaded_plots[selected[0]]
+            filetypes = [('Comma-Separated Values', '*.csv')]
+            savepath = tk.filedialog.asksaveasfilename(title='Save data',
+                                                        defaultextension='.csv',
+                                                        initialfile=plot.name,
+                                                        filetypes=filetypes)
+            if savepath:
+                final_path = self.create_file_name(savepath)
+                plot.data.to_csv(final_path)
+
+        elif len(selected) > 1:
+            folder = tk.filedialog.askdirectory(title='Save multiple files')
+            if folder:
+                for s in selected:
+                    plot = self.loaded_plots.get(s)
+                    data = plot.data
+                    save_name = 'data for ' + plot.name + '.csv'
+                    full_save = os.path.join(folder, save_name)
+                    final = self.create_file_name(full_save)
+                    data.to_csv(final)
 
     #---settings functions
     def get_argument_settings_dict(self):
