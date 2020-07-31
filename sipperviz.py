@@ -332,6 +332,7 @@ class SipperViz(tk.Tk):
         self.makeplot_window = tk.Toplevel(self)
         self.makeplot_window.grid_rowconfigure(0, weight=1)
         self.makeplot_window.withdraw()
+        self.makeplot_window.resizable(False, True)
         self.makeplot_window.title('Create Plots')
         self.makeplot_window.protocol("WM_DELETE_WINDOW",
                                       self.close_makeplot_window)
@@ -343,17 +344,24 @@ class SipperViz(tk.Tk):
                                                height=12)
         self.makeplot_selection.column('#0', width=230)
         self.makeplot_selection.heading('#0', text='Plots')
-        self.makeplot_drinks = self.makeplot_selection.insert('', 1, text='Drink Plots')
+        self.makeplot_drinks = self.makeplot_selection.insert('', 1, text='Drink Plots',
+                                                              open=True)
         self.makeplot_selection.insert(self.makeplot_drinks, 1, text='Drink Count (Cumulative)')
         self.makeplot_selection.insert(self.makeplot_drinks, 2, text='Drink Duration (Cumulative)')
-        # self.makeplot_selection.bind('<<TreeviewSelect>>', self.check_plottable)
+        self.makeplot_selection.bind('<<TreeviewSelect>>', self.update_makeplot_run)
         self.makeplot_scroll = ttk.Scrollbar(self.makeplot_selectionframe,
                                              command=self.makeplot_selection.yview,)
         self.makeplot_selection.configure(yscrollcommand=self.makeplot_scroll.set)
         self.makeplot_selection.grid(row=0, column=0, sticky='nsw')
         self.makeplot_scroll.grid(row=0, column=1, sticky='nsw')
 
-        self.makeplot_selectionframe.grid(row=0, column=0, sticky='nsew')
+        self.makeplot_run_button = tk.Button(self.makeplot_window, text='Run', command=print)
+        self.makeplot_cancel_button = tk.Button(self.makeplot_window, text='Cancel',
+                                                command=self.close_makeplot_window)
+
+        self.makeplot_selectionframe.grid(row=0, column=0, sticky='nsew', columnspan=2)
+        self.makeplot_run_button.grid(row=1, column=0, sticky='nsew')
+        self.makeplot_cancel_button.grid(row=1, column=1, sticky='nsew')
 
     #---create treeview panes (left sash)
         self.left_sash = ttk.PanedWindow(self.main_frame, orient='vertical')
@@ -723,6 +731,27 @@ class SipperViz(tk.Tk):
                 self.plot_info.insert(x, 1, text='end : ' + str(v[1]))
         if not dfilter:
             self.plot_info.insert('','end', text='date filter : False')
+
+    def is_plottable(self, graphname):
+        val = False
+        if graphname in ['Drink Count (Cumulative)',
+                         'Drink Duration (Cumulative)',
+                         'Drink Count (Binned)',
+                         'Drink Duration (Binned)']:
+            if self.file_view.selection():
+                val = True
+        return val
+
+    def update_makeplot_run(self, event):
+        selected = self.makeplot_selection.selection()
+        plottable_list = []
+        for i in selected:
+            text = self.makeplot_selection.item(i, 'text')
+            plottable_list.append(self.is_plottable(text))
+        if any(plottable_list):
+            self.makeplot_run_button.configure(state='normal')
+        else:
+            self.makeplot_run_button.configure(state='disabled')
 
     def close_makeplot_window(self):
         self.makeplot_window.grab_release()
