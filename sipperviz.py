@@ -17,6 +17,7 @@ import pandas as pd
 from tkcalendar import DateEntry
 
 import sipper
+import sipperinspect
 import sipperplots
 
 class SipperPlot:
@@ -60,6 +61,7 @@ class SipperViz(tk.Tk):
                               'show_left': 'show left',
                               'show_right': 'show right',
                               'show_content': 'content'}
+        self.suspend_plot_raising = False
 
     #---data management
         self.loaded_sippers = []
@@ -388,7 +390,7 @@ class SipperViz(tk.Tk):
                                           image=self.icons['picture'],
                                           text='Save', compound='top',
                                           borderwidth=0,
-                                          command=print,
+                                          command=self.save_plots,
                                           width=40)
         self.plot_data_button = tk.Button(self.button_frame,
                                           image=self.icons['spreadsheet'],
@@ -400,7 +402,7 @@ class SipperViz(tk.Tk):
                                           image=self.icons['script'],
                                           text='Code', compound='top',
                                           borderwidth=0,
-                                          command=print,
+                                          command=self.show_plot_code,
                                           width=40)
         self.plot_delete_button = tk.Button(self.button_frame,
                                             image=self.icons['delete_graph'],
@@ -490,7 +492,7 @@ class SipperViz(tk.Tk):
 
     #---create plotting area
         self.plot_frame = tk.Frame(self.main_frame)
-        self.fig = mpl.figure.Figure(figsize=(12, 5))
+        self.fig = mpl.figure.Figure(figsize=(10, 6), dpi=100)
         self.ax = self.fig.add_subplot()
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
         self.canvas.draw_idle()
@@ -542,11 +544,11 @@ class SipperViz(tk.Tk):
     #---operations pre opening
         last_settings = 'memory/settings/LAST_USED.CSV'
         if os.path.isfile(last_settings):
-            self.load_settings_df(last_settings)
-            # try:
-            #     self.load_settings_df(last_settings)
-            # except:
-            #     print('Found LAST_USED settings but unable to load!')
+            # self.load_settings_df(last_settings)
+            try:
+                self.load_settings_df(last_settings)
+            except:
+                print('Found LAST_USED settings but unable to load!')
         self.set_date_filter_state()
 
     #---file functions
@@ -648,13 +650,13 @@ class SipperViz(tk.Tk):
             name = self.create_plot_name(self.plot_default_names[func])
             plot = SipperPlot(name, func, args)
             self.loaded_plots[name] = plot
-            func(**args)
             self.plot_list.insert('', 'end', iid=plot.name, values=[plot.name])
             self.display_plot(plot, new=True)
         if self.bad_date_sippers:
             self.raise_dfilter_error()
 
     def display_plot(self, plot, new=False):
+        self.suspend_plot_raising = True
         if new:
             self.plot_list.selection_remove(self.plot_list.selection())
             self.plot_list.selection_set(plot.name)
@@ -663,12 +665,14 @@ class SipperViz(tk.Tk):
         plot.func(**plot.args)
         self.canvas.draw_idle()
         self.update()
+        self.suspend_plot_raising = False
 
     def raise_plot_from_click(self, event):
-        clicked = self.plot_list.selection()
-        if len(clicked) == 1:
-            plot = self.loaded_plots[clicked[0]]
-            self.display_plot(plot)
+        if not self.suspend_plot_raising:
+            clicked = self.plot_list.selection()
+            if len(clicked) == 1:
+                plot = self.loaded_plots[clicked[0]]
+                self.display_plot(plot)
 
     def display_plot_details(self, plot):
         self.plot_info.delete(*self.plot_info.get_children())
@@ -685,6 +689,59 @@ class SipperViz(tk.Tk):
                 self.plot_info.insert(x, 1, text='end : ' + str(v[1]))
         if not dfilter:
             self.plot_info.insert('','end', text='date filter : False')
+
+    #---plot button functions
+    def save_plots(self):
+        selected = self.plot_list.selection()
+        if len(selected) == 1:
+            s = self.loaded_plots[selected[0]]
+            filetypes = [('Portable Network Graphic', '*.png')]
+            savepath = tk.filedialog.asksaveasfilename(title='Save plot',
+                                                        defaultextension='.csv',
+                                                        initialfile=s.name,
+                                                        filetypes=filetypes)
+            if savepath:
+                self.fig.savefig(savepath, dpi=300)
+                self.fig.set_dpi(100)
+                self.canvas.draw_idle()
+                self.nav_toolbar.update()
+                self.update()
+
+        elif len(selected) > 1:
+            folder = tk.filedialog.askdirectory(title='Save multiple files')
+            if folder:
+                for s in selected:
+                    plot = self.loaded_plots.get(s)
+                    self.display_plot(plot)
+                    save_name = plot.name + '.png'
+                    full_save = os.path.join(folder, save_name)
+                    final = self.create_file_name(full_save)
+                    self.fig.savefig(final, dpi=300)
+                    self.fig.set_dpi(100)
+                    self.canvas.draw_idle()
+                    self.nav_toolbar.update()
+                    self.update()
+
+    def show_plot_code(self):
+        clicked = self.plot_list.selection()
+        for i in clicked:
+            plot  = self.loaded_plots[i]
+            name = plot.name
+            new_window = tk.Toplevel(self)
+            new_window.title('Code for "' + name +'"')
+            textview = tk.Text(new_window, width=150)
+            code = sipperinspect.generate_code(plot)
+            textview.insert(tk.END, code)
+            textview.configure(state=tk.DISABLED)
+            scrollbar = tk.Scrollbar(new_window, command=textview.yview)
+            textview['yscrollcommand'] = scrollbar.set
+            save_button = tk.Button(new_window, text='Save as...',
+                                    command=print)
+            textview.grid(row=0,column=0,sticky='nsew')
+            scrollbar.grid(row=0,column=1,sticky='nsew')
+            save_button.grid(row=1,column=0,sticky='w')
+            new_window.grid_rowconfigure(0,weight=1)
+            new_window.grid_columnconfigure(0,weight=1)
 
     #---settings functions
     def get_argument_settings_dict(self):

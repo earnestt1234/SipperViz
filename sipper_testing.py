@@ -22,3 +22,77 @@ t = sipper.Sipper(path2)
 g = t.data
 
 o = sipper.sipper_concat([s,t])
+#%%
+import tkinter as tk
+from tkinter.font import Font
+
+class CustomText(tk.Text):
+    '''A text widget with a new method, highlight_pattern()
+
+    example:
+
+    text = CustomText()
+    text.tag_configure("red", foreground="#ff0000")
+    text.highlight_pattern("this should be red", "red")
+
+    The highlight_pattern method is a simplified python
+    version of the tcl code at http://wiki.tcl.tk/3246
+    '''
+    def __init__(self, *args, **kwargs):
+        tk.Text.__init__(self, *args, **kwargs)
+
+    def highlight_pattern(self, pattern, tag, start="1.0", end="end",
+                          regexp=False):
+        '''Apply the given tag to all text that matches the given pattern
+
+        If 'regexp' is set to True, pattern will be treated as a regular
+        expression according to Tcl's regular expression syntax.
+        '''
+
+        start = self.index(start)
+        end = self.index(end)
+        self.mark_set("matchStart", start)
+        self.mark_set("matchEnd", start)
+        self.mark_set("searchLimit", end)
+
+        count = tk.IntVar()
+        while True:
+            index = self.search(pattern, "matchEnd","searchLimit",
+                                count=count, regexp=regexp)
+            if index == "": break
+            if count.get() == 0: break # degenerate pattern which matches zero-length strings
+            self.mark_set("matchStart", index)
+            self.mark_set("matchEnd", "%s+%sc" % (index, count.get()))
+            self.tag_add(tag, "matchStart", "matchEnd")
+
+root = tk.Tk()
+text = """
+def foo(a, b, c=10)
+    return a + b + c
+
+class Main
+    def __init__(self, value):
+        self.value = value
+
+# this is a comment
+
+x = 1
+d = 1.0
+b = [1,2,3]
+s = ["a"]
+ss = ['a']"""
+widget = CustomText(root, font='Courier')
+widget.tag_configure('comment', foreground='gray')
+widget.tag_configure('number', foreground='blue')
+widget.tag_configure('string', foreground='green')
+widget.tag_configure('keyword1', foreground='purple')
+widget.tag_configure('self', foreground='red', font='Courier 12 italic')
+widget.pack()
+widget.insert('end', text)
+widget.highlight_pattern('#.*', tag='comment', regexp=True)
+widget.highlight_pattern('\d', tag='number', regexp=True)
+widget.highlight_pattern('"."|\'.\'', tag='string', regexp=True)
+widget.highlight_pattern('\n*\s*def\s', tag='keyword1', regexp=True)
+widget.highlight_pattern('\n*\s*class\s', tag='keyword1', regexp=True)
+widget.highlight_pattern('self', tag='self')
+root.mainloop()
