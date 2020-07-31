@@ -328,6 +328,33 @@ class SipperViz(tk.Tk):
         for i in range(6):
             self.assign_frame4.columnconfigure(i, weight=1)
 
+    #---create make plot window
+        self.makeplot_window = tk.Toplevel(self)
+        self.makeplot_window.grid_rowconfigure(0, weight=1)
+        self.makeplot_window.withdraw()
+        self.makeplot_window.title('Create Plots')
+        self.makeplot_window.protocol("WM_DELETE_WINDOW",
+                                      self.close_makeplot_window)
+
+    #---populate make plot window
+        self.makeplot_selectionframe = tk.Frame(self.makeplot_window)
+        self.makeplot_selectionframe.grid_rowconfigure(0, weight=1)
+        self.makeplot_selection = ttk.Treeview(self.makeplot_selectionframe,
+                                               height=12)
+        self.makeplot_selection.column('#0', width=230)
+        self.makeplot_selection.heading('#0', text='Plots')
+        self.makeplot_drinks = self.makeplot_selection.insert('', 1, text='Drink Plots')
+        self.makeplot_selection.insert(self.makeplot_drinks, 1, text='Drink Count (Cumulative)')
+        self.makeplot_selection.insert(self.makeplot_drinks, 2, text='Drink Duration (Cumulative)')
+        # self.makeplot_selection.bind('<<TreeviewSelect>>', self.check_plottable)
+        self.makeplot_scroll = ttk.Scrollbar(self.makeplot_selectionframe,
+                                             command=self.makeplot_selection.yview,)
+        self.makeplot_selection.configure(yscrollcommand=self.makeplot_scroll.set)
+        self.makeplot_selection.grid(row=0, column=0, sticky='nsw')
+        self.makeplot_scroll.grid(row=0, column=1, sticky='nsw')
+
+        self.makeplot_selectionframe.grid(row=0, column=0, sticky='nsew')
+
     #---create treeview panes (left sash)
         self.left_sash = ttk.PanedWindow(self.main_frame, orient='vertical')
 
@@ -389,7 +416,7 @@ class SipperViz(tk.Tk):
                                      image=self.icons['graph'],
                                      text='Plot', compound='top',
                                      borderwidth=0,
-                                     command=print,
+                                     command=self.makeplot_window.deiconify,
                                      width=40)
         self.plot_save_button = tk.Button(self.button_frame,
                                           image=self.icons['picture'],
@@ -696,6 +723,11 @@ class SipperViz(tk.Tk):
                 self.plot_info.insert(x, 1, text='end : ' + str(v[1]))
         if not dfilter:
             self.plot_info.insert('','end', text='date filter : False')
+
+    def close_makeplot_window(self):
+        self.makeplot_window.grab_release()
+        self.grab_set()
+        self.makeplot_window.withdraw()
 
     #---plot button functions
     def delete_plots(self):
