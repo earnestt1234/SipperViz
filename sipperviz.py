@@ -56,10 +56,15 @@ class SipperViz(tk.Tk):
                                    'Drink Count (Cumulative)',
                                    sipperplots.drinkduration_cumulative:
                                    'Drink Duration (Cumulative)'}
+        self.plot_names_to_funcs = {v:k for k,v in self.plot_default_names.items()}
         self.get_data_funcs = {sipperplots.drinkcount_cumulative:
                                    sipperplots.get_line_data,
                                sipperplots.drinkduration_cumulative:
                                    sipperplots.get_line_data}
+        self.plot_routes = {sipperplots.drinkcount_cumulative:
+                                self.iter_plot,
+                            sipperplots.drinkduration_cumulative:
+                                self.iter_plot,}
         self.args_to_names = {'shade_dark':'shade dark',
                               'lights_on': 'lights on',
                               'lights_off': 'lights off',
@@ -355,7 +360,8 @@ class SipperViz(tk.Tk):
         self.makeplot_selection.grid(row=0, column=0, sticky='nsw')
         self.makeplot_scroll.grid(row=0, column=1, sticky='nsw')
 
-        self.makeplot_run_button = tk.Button(self.makeplot_window, text='Run', command=print)
+        self.makeplot_run_button = tk.Button(self.makeplot_window, text='Run',
+                                             command=self.run_makeplots)
         self.makeplot_cancel_button = tk.Button(self.makeplot_window, text='Cancel',
                                                 command=self.close_makeplot_window)
 
@@ -424,7 +430,7 @@ class SipperViz(tk.Tk):
                                      image=self.icons['graph'],
                                      text='Plot', compound='top',
                                      borderwidth=0,
-                                     command=self.makeplot_window.deiconify,
+                                     command=self.raise_makeplot_window,
                                      width=40)
         self.plot_save_button = tk.Button(self.button_frame,
                                           image=self.icons['picture'],
@@ -512,7 +518,7 @@ class SipperViz(tk.Tk):
         self.files_scroll = ttk.Scrollbar(self.file_frame,
                                           command=self.file_view.yview,)
         self.file_view.configure(yscrollcommand=self.files_scroll.set)
-        self.file_view.bind('<<TreeviewSelect>>', self.display_details)
+        self.file_view.bind('<<TreeviewSelect>>', self.handle_file_select)
         self.file_frame.grid_rowconfigure(0,weight=1)
         self.file_view.grid(row=0, column=0, sticky='nsw')
         self.files_scroll.grid(row=0,column=1,sticky='nsw')
@@ -590,6 +596,7 @@ class SipperViz(tk.Tk):
             except:
                 print('Found LAST_USED settings but unable to load!')
         self.set_date_filter_state()
+        self.update_all_buttons()
 
     #---file functions
     def load_files(self):
@@ -606,6 +613,7 @@ class SipperViz(tk.Tk):
                     print(tb)
             self.update_file_view()
             self.update_avail_contents()
+            self.update_all_buttons()
 
     def delete_files(self):
         selected = [int(i) for i in self.file_view.selection()]
@@ -613,6 +621,7 @@ class SipperViz(tk.Tk):
             del(self.loaded_sippers[index])
         self.update_file_view()
         self.update_avail_contents()
+        self.update_all_buttons()
 
     def save_files(self):
         selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
@@ -654,6 +663,34 @@ class SipperViz(tk.Tk):
         self.file_view.delete(*self.file_view.get_children())
         for i, s in enumerate(self.loaded_sippers):
             self.file_view.insert("", i, str(i), text=s.filename, tag='file')
+
+    def update_all_buttons(self, *event):
+        #if files are selected
+        if self.file_view.selection():
+            self.delete_button.configure(state='normal')
+            self.savefile_button.configure(state='normal')
+            self.concat_button.configure(state='normal')
+            self.assign_button.configure(state='normal')
+        else:
+            self.delete_button.configure(state='disabled')
+            self.savefile_button.configure(state='disabled')
+            self.concat_button.configure(state='disabled')
+            self.assign_button.configure(state='disabled')
+        #if plots are selected
+        if self.plot_list.selection():
+            self.plot_delete_button.configure(state='normal')
+            self.plot_save_button.configure(state='normal')
+            self.plot_data_button.configure(state='normal')
+            self.plot_code_button.configure(state='normal')
+        else:
+            self.plot_delete_button.configure(state='disabled')
+            self.plot_save_button.configure(state='disabled')
+            self.plot_data_button.configure(state='disabled')
+            self.plot_code_button.configure(state='disabled')
+
+    def handle_file_select(self, *event):
+        self.display_details()
+        self.update_all_buttons()
 
     #---info pane functions
     def display_details(self, *event):
@@ -708,6 +745,7 @@ class SipperViz(tk.Tk):
         self.canvas.draw_idle()
         self.update()
         self.suspend_plot_raising = False
+        self.update_all_buttons()
 
     def raise_plot_from_click(self, event):
         if not self.suspend_plot_raising:
@@ -742,7 +780,11 @@ class SipperViz(tk.Tk):
                 val = True
         return val
 
-    def update_makeplot_run(self, event):
+    def raise_makeplot_window(self):
+        self.makeplot_window.deiconify()
+        self.update_makeplot_run()
+
+    def update_makeplot_run(self, *event):
         selected = self.makeplot_selection.selection()
         plottable_list = []
         for i in selected:
@@ -758,6 +800,14 @@ class SipperViz(tk.Tk):
         self.grab_set()
         self.makeplot_window.withdraw()
 
+    def run_makeplots(self):
+        for i in self.makeplot_selection.selection():
+            graphname = self.makeplot_selection.item(i)['text']
+            if self.is_plottable(graphname):
+                plot_func = self.plot_names_to_funcs[graphname]
+                route_func = self.plot_routes[plot_func]
+                route_func(plot_func)
+
     #---plot button functions
     def delete_plots(self):
         selected = self.plot_list.selection()
@@ -771,6 +821,7 @@ class SipperViz(tk.Tk):
             self.ax.clear()
             self.canvas.draw_idle()
             self.update()
+            self.update_all_buttons()
 
     def save_plots(self):
         selected = self.plot_list.selection()
