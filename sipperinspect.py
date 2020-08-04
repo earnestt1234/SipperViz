@@ -19,9 +19,13 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from pandas import Timestamp
 from pandas.plotting import register_matplotlib_converters
 
 register_matplotlib_converters()
+
+#setting style
+plt.style.use('seaborn-whitegrid')
 """
 
 # relate each function name to its function from sipperplots
@@ -30,6 +34,9 @@ func_dict = {name:func for name, func in inspect.getmembers(sipperplots)}
 # create lists of plots grouped by helper functions needed
 shade_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
 date_format_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
+
+#create a list of arguments that need to be formatted as a string
+string_args = ['binsize']
 
 # create strings of the helper function code
 shade_help = '# shading dark periods\n\n'
@@ -42,22 +49,35 @@ shade_help += inspect.getsource(sipperplots.shade_darkness) + '\n'
 date_format_help = '# formatting date x-axis\n\n'
 date_format_help += inspect.getsource(sipperplots.date_format_x) + '\n'
 
+def add_quotes(string):
+    output = '"' + string + '"'
+    return output
+
 def generate_code(sipper_plot):
     func = sipper_plot.func
+    funcname = func.__name__
     output = ''
 
     # imports
     output += imports + '\n'
 
+    # helper functions for loading sippers
+    output += '# sipper loading helper functions\n'
+    output += inspect.getsource(sipperplots.date_filter_okay) + '\n'
+    output += inspect.getsource(sipper.SipperError) + '\n'
+    output += inspect.getsource(sipper.SipperWarning) + '\n'
+    output += inspect.getsource(sipper.is_concatable) + '\n'
+    output += inspect.getsource(sipper.groupby_getcontentdict) + '\n'
+    output += inspect.getsource(sipper.groupby_convertcontent) + '\n'
+
     # code to load sippers
     output += '# loading sipper files\n'
-    output += inspect.getsource(sipperplots.date_filter_okay) + '\n'
     output += inspect.getsource(sipper.Sipper) + '\n'
 
     # helper functions
-    if func in shade_funcs:
+    if funcname in shade_funcs:
         output += shade_help
-    if func in date_format_funcs:
+    if funcname in date_format_funcs:
         output += date_format_help
 
     # plotting function
@@ -78,10 +98,19 @@ def generate_code(sipper_plot):
     for arg in func_args:
         #handle multiple sippers, else single sippers can
         #follow the else condition for formatting
-        if arg == 'sippers':
+        if arg == 'sipper':
+            output += arg + ' = ' + str(used_args[arg]) + '\n'
+            s = used_args[arg]
+            if sipper_plot.content_dicts[s]:
+                d = sipper_plot.content_dicts[s]
+                output += arg + '.assign_contents({})\n'.format(d)
+        elif arg == 'sippers':
             pass
         else:
-            output += arg + ' = ' + str(used_args[arg]) + '\n'
+            formatted = str(used_args[arg])
+            if arg in string_args:
+                formatted = add_quotes(formatted)
+            output += arg + ' = ' + formatted + '\n'
 
     # call
     output += '\n# calling the function\n'

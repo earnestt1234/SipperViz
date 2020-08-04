@@ -31,6 +31,13 @@ def groupby_convertcontent(gr, content, out='Count'):
     output = pd.concat(output)
     return output - np.nanmin(output)
 
+def groupby_getcontentdict(d):
+    t1 = d.index.min()
+    t2 = d.index.max()
+    s1 = d['LeftContents'].unique()[0]
+    s2 = d['RightContents'].unique()[0]
+    return {(t1, t2):(s1, s2)}
+
 def is_concatable(sippers):
     """
     Determines whether or not Sipper files can be concatenated,
@@ -124,9 +131,11 @@ class Sipper():
         self.right_name = 'Right'
         self.end_date = self.data.index[-1]
         self.duration = self.end_date - self.start_date
-        self.contents_dates = OrderedDict()
+        self.contents_dict = self.get_contents_dict()
         self.contents = self.set_of_contents()
         self.groups = []
+        self.sipperviz_assigned = False
+        # ^ extra steps for plot code must be added if True
 
     def __repr__(self):
         """Shows the directory used to make the file."""
@@ -138,7 +147,7 @@ class Sipper():
             if not date_filter_okay(self.data, start, end):
                 continue
             else:
-                self.contents_dates[(start,end)] = (left,right)
+                self.contents_dict[(start,end)] = (left,right)
                 if start not in self.data.index:
                     before = self.data.index[self.data.index < start].max()
                     if not pd.isna(before):
@@ -173,3 +182,16 @@ class Sipper():
         gr = subset.groupby(changes)
         name = content+out
         return groupby_convertcontent(gr, content=content, out=out).rename(name)
+
+    def get_contents_dict(self, df=pd.DataFrame()):
+        if df.empty:
+            df = self.data
+        df = df.dropna(subset=['LeftContents', 'RightContents']).copy()
+        l = df['LeftContents'].ne(df['LeftContents'].shift().bfill())
+        r = df['RightContents'].ne(df['RightContents'].shift().bfill())
+        changes = (l|r).astype(int).cumsum()
+        groupdict = df.groupby(changes).apply(groupby_getcontentdict).to_dict()
+        output = {}
+        for i in groupdict.values():
+            output.update(i)
+        return output

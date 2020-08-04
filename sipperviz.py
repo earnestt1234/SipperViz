@@ -26,6 +26,14 @@ class SipperPlot:
         self.func = func
         self.args = args
         self.data = pd.DataFrame()
+        self.content_dicts = {}
+        self.populate_content_dicts()
+
+    def populate_content_dicts(self):
+        if 'sipper' in self.args:
+            s = self.args['sipper']
+            v = s.get_contents_dict() if s.sipperviz_assigned else {}
+            self.content_dicts[s] = v
 
 class SipperViz(tk.Tk):
     """Class for SipViz"""
@@ -34,6 +42,7 @@ class SipperViz(tk.Tk):
     def __init__(self):
         super(SipperViz, self).__init__()
     #---constants/conversions
+        #pretty names for Sipper attributes represented in info pane
         self.attr_conversion = {'Start':'start_date', 'End':'end_date',
                                 'Duration':'duration', 'Device': 'device_no',
                                 'Left Sipper Name':'left_name',
@@ -41,6 +50,8 @@ class SipperViz(tk.Tk):
                                 'Contents': 'contents',
                                 'Version': 'version', 'Groups':'groups'}
         self.file_info_names = list(self.attr_conversion.keys())
+
+        #way to covert times to integers
         self.times = []
         for xm in [' am', ' pm']:
             for num in range(0,12):
@@ -50,27 +61,65 @@ class SipperViz(tk.Tk):
                 if time == '0 pm':
                     time = 'noon'
                 self.times.append(time)
-
         self.times_to_int = {time : num for num,time in enumerate(self.times)}
+
+        #binsizes
+        self.binsizes = ['5 minutes', '10 minutes', '15 minutes', '30 minutes', '1 hour']
+        self.binsizes += [str(i) + ' hours' for i in range(2,25)]
+        self.bin_convert = {}
+        for val in self.binsizes:
+            out =''
+            for char in val:
+                if char.isdigit():
+                    out += char
+            if 'minutes' in val:
+                out += 'T'
+            elif 'hour' in val:
+                out += 'H'
+            self.bin_convert[val] = out
+
+        #link each plot function to a pretty name
+        #also reverse the dictionary when needing to access the plot from the name
         self.plot_default_names = {sipperplots.drinkcount_cumulative:
-                                   'Drink Count (Cumulative)',
+                                       'Drink Count (Cumulative)',
                                    sipperplots.drinkduration_cumulative:
-                                   'Drink Duration (Cumulative)'}
+                                       'Drink Duration (Cumulative)',
+                                   sipperplots.drinkcount_binned:
+                                       'Drink Count (Binned)',
+                                   sipperplots.drinkduration_binned:
+                                       'Drink Duration (Binned)', }
         self.plot_names_to_funcs = {v:k for k,v in self.plot_default_names.items()}
-        self.get_data_funcs = {sipperplots.drinkcount_cumulative:
-                                   sipperplots.get_line_data,
-                               sipperplots.drinkduration_cumulative:
-                                   sipperplots.get_line_data}
-        self.plot_routes = {sipperplots.drinkcount_cumulative:
-                                self.iter_plot,
-                            sipperplots.drinkduration_cumulative:
-                                self.iter_plot,}
+
+        #link each plot to a functiong for retrieving data
+        self.get_data_funcs = {}
+        #  for all simple line plots
+        for func in [
+                sipperplots.drinkcount_cumulative,
+                sipperplots.drinkcount_binned,
+                sipperplots.drinkduration_cumulative,
+                sipperplots.drinkduration_binned,]:
+            self.get_data_funcs[func] = sipperplots.get_line_data
+
+        #link each plot to how sipperviz will create it
+        self.plot_routes = {}
+        #  for all plots which are iteratively created when multiple files selected
+        for func in [
+                sipperplots.drinkcount_cumulative,
+                sipperplots.drinkcount_binned,
+                sipperplots.drinkduration_cumulative,
+                sipperplots.drinkduration_binned,]:
+            self.plot_routes[func] = self.iter_plot
+
+        #pretty names for plot arguments, for plot details pane
         self.args_to_names = {'shade_dark':'shade dark',
                               'lights_on': 'lights on',
                               'lights_off': 'lights off',
                               'show_left': 'show left',
                               'show_right': 'show right',
-                              'show_content': 'content'}
+                              'show_content': 'content',
+                              'binsize': 'binning size'}
+
+        #flag to prevent repetitive drawing of plots
         self.suspend_plot_raising = False
 
     #---data management
@@ -207,11 +256,19 @@ class SipperViz(tk.Tk):
         self.drink_showcontent_box = tk.Checkbutton(self.drink_settings,
                                                  variable=self.drink_showcontent_val,
                                                  text='Show contents (see Content tab)')
+        self.drink_binsize_label = tk.Label(self.drink_settings,
+                                            text='Bin size for binned plots')
+        self.drink_binsize_menu = ttk.Combobox(self.drink_settings,
+                                               values=self.binsizes)
+        self.drink_binsize_menu.set('1 hour')
 
-        self.drink_settings_label.grid(row=0, column=1, sticky='nsew', padx=20, pady=5)
-        self.drink_showleft_box.grid(row=1, column=1, sticky='w', padx=20, pady=5)
-        self.drink_showright_box.grid(row=2, column=1, sticky='w', padx=20, pady=5)
-        self.drink_showcontent_box.grid(row=3, column=1, sticky='w', padx=20, pady=5)
+        self.drink_settings_label.grid(row=0, column=0, sticky='nsew', padx=20, pady=5,
+                                       columnspan=2)
+        self.drink_showleft_box.grid(row=1, column=0, sticky='w', padx=20, pady=5)
+        self.drink_showright_box.grid(row=2, column=0, sticky='w', padx=20, pady=5)
+        self.drink_showcontent_box.grid(row=3, column=0, sticky='w', padx=20, pady=5)
+        self.drink_binsize_label.grid(row=4, column=0, sticky='w', padx=20, pady=5)
+        self.drink_binsize_menu.grid(row=4, column=1, sticky='nsew', padx=20, pady=5)
 
     #---create general settings window
         self.general_settings = tk.Toplevel(self)
@@ -352,7 +409,9 @@ class SipperViz(tk.Tk):
         self.makeplot_drinks = self.makeplot_selection.insert('', 1, text='Drink Plots',
                                                               open=True)
         self.makeplot_selection.insert(self.makeplot_drinks, 1, text='Drink Count (Cumulative)')
-        self.makeplot_selection.insert(self.makeplot_drinks, 2, text='Drink Duration (Cumulative)')
+        self.makeplot_selection.insert(self.makeplot_drinks, 2, text='Drink Count (Binned)')
+        self.makeplot_selection.insert(self.makeplot_drinks, 3, text='Drink Duration (Cumulative)')
+        self.makeplot_selection.insert(self.makeplot_drinks, 4, text='Drink Duration (Binned)')
         self.makeplot_selection.bind('<<TreeviewSelect>>', self.update_makeplot_run)
         self.makeplot_scroll = ttk.Scrollbar(self.makeplot_selectionframe,
                                              command=self.makeplot_selection.yview,)
@@ -384,8 +443,12 @@ class SipperViz(tk.Tk):
         self.plotmenu = tk.Menu(self.menubar, tearoff=0)
         self.plotmenu.add_command(label='Drink Count (Cumulative)', command=lambda:
                                   self.iter_plot(sipperplots.drinkcount_cumulative))
+        self.plotmenu.add_command(label='Drink Count (Binned)', command=lambda:
+                                  self.iter_plot(sipperplots.drinkcount_binned))
         self.plotmenu.add_command(label='Drink Duration (Cumulative)', command=lambda:
                                   self.iter_plot(sipperplots.drinkduration_cumulative))
+        self.plotmenu.add_command(label='Drink Duration (Binned)', command=lambda:
+                                  self.iter_plot(sipperplots.drinkduration_binned))
         self.menubar.add_cascade(menu=self.plotmenu, label='Plot')
 
     #---create buttons
@@ -590,7 +653,7 @@ class SipperViz(tk.Tk):
     #---operations pre opening
         last_settings = 'memory/settings/LAST_USED.CSV'
         if os.path.isfile(last_settings):
-            # self.load_settings_df(last_settings)
+            self.load_settings_df(last_settings)
             try:
                 self.load_settings_df(last_settings)
             except:
@@ -622,6 +685,7 @@ class SipperViz(tk.Tk):
         self.update_file_view()
         self.update_avail_contents()
         self.update_all_buttons()
+        self.display_details()
 
     def save_files(self):
         selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
@@ -702,7 +766,15 @@ class SipperViz(tk.Tk):
             for i, name in enumerate(self.file_info_names):
                 attr = str(getattr(s, self.attr_conversion[name]))
                 text = ' : '.join([name, attr])
-                self.info_view.insert('', i, text=text, tag='spec')
+                self.info_view.insert('', i, text=text)
+        elif len(selected) > 1:
+            mindate = min([s.start_date for s in selected])
+            maxdate = max([s.end_date for s in selected])
+            nos = list(set([s.device_no for s in selected]))
+            self.info_view.insert('', 1, text='Selected : {}'.format(len(selected)))
+            self.info_view.insert('', 2, text='Start : {}'.format(mindate))
+            self.info_view.insert('', 3, text='End : {}'.format(maxdate))
+            self.info_view.insert('', 4, text='Device #s: {}'.format(nos))
 
     #---plotting functions
     def iter_plot(self, func):
@@ -711,7 +783,7 @@ class SipperViz(tk.Tk):
                    for i in self.file_view.selection()]
         for i, s in enumerate(sippers):
             self.ax.clear()
-            all_args = self.get_argument_settings_dict()
+            all_args = self.get_settings_dict_as_args()
             func_args = inspect.getfullargspec(func).args
             args = {k:v for k,v in all_args.items() if k in func_args}
             if self.date_filter_val.get():
@@ -822,6 +894,7 @@ class SipperViz(tk.Tk):
             self.canvas.draw_idle()
             self.update()
             self.update_all_buttons()
+            self.plot_info.delete(*self.plot_info.get_children())
 
     def save_plots(self):
         selected = self.plot_list.selection()
@@ -900,31 +973,36 @@ class SipperViz(tk.Tk):
                     data.to_csv(final)
 
     #---settings functions
-    def get_argument_settings_dict(self):
-        lon = self.times_to_int[self.lightson_menu.get()]
-        loff = self.times_to_int[self.lightsoff_menu.get()]
+    def get_settings_dict(self):
+        settings_dict = dict(dfilter_val     =self.date_filter_val.get(),
+                             dfilter_sdate   =self.dfilter_s_date.get_date(),
+                             dfilter_edate   =self.dfilter_e_date.get_date(),
+                             dfilter_shour   =self.dfilter_s_hour.get(),
+                             dfilter_ehour   =self.dfilter_e_hour.get(),
+                             shade_dark      =self.shade_dark_val.get(),
+                             lights_on       =self.lightson_menu.get(),
+                             lights_off      =self.lightsoff_menu.get(),
+                             show_left       =self.drink_showleft_val.get(),
+                             show_right      =self.drink_showright_val.get(),
+                             show_content_val=self.drink_showcontent_val.get(),
+                             binsize         =self.drink_binsize_menu.get())
+        return settings_dict
+
+    def get_settings_dict_as_args(self):
         if self.drink_showcontent_val.get():
             drink_content = list(self.contentselect.selection())
         else:
             drink_content = []
-        settings_dict = {'shade_dark'  :self.shade_dark_val.get(),
-                         'lights_on'   :lon,
-                         'lights_off'  :loff,
-                         'show_left'   :self.drink_showleft_val.get(),
-                         'show_right'  :self.drink_showright_val.get(),
-                         'show_content':drink_content}
+        settings_dict = self.get_settings_dict()
+        settings_dict['show_content'] = drink_content
+        for time_setting in ['lights_on','lights_off']:
+            settings_dict[time_setting] = self.times_to_int[settings_dict[time_setting]]
+        for bin_setting in ['binsize']:
+            settings_dict[bin_setting] = self.bin_convert[settings_dict[bin_setting]]
         return settings_dict
 
-    def get_all_settings_df(self):
-        #first get plot settings:
-        d = self.get_argument_settings_dict()
-        #then add general settings
-        d['dfilter_val'] = self.date_filter_val.get()
-        d['dfilter_sdate'] = self.dfilter_s_date.get_date()
-        d['dfilter_edate'] = self.dfilter_e_date.get_date()
-        d['dfilter_shour'] = self.times_to_int[self.dfilter_s_hour.get()]
-        d['dfilter_ehour'] = self.times_to_int[self.dfilter_e_hour.get()]
-        d['show_content_val'] = self.drink_showcontent_val.get()
+    def get_settings_df(self):
+        d = self.get_settings_dict()
         settings_df = pd.DataFrame(columns=['Value'])
         for k, v in d.items():
             settings_df.loc[k, 'Value'] = v
@@ -942,11 +1020,12 @@ class SipperViz(tk.Tk):
             df = pd.read_csv(path, index_col=0)
             v = 'Value'
             self.shade_dark_val.set(df.loc['shade_dark', v])
-            self.lightson_menu.set(self.times[int(df.loc['lights_on', v])])
-            self.lightsoff_menu.set(self.times[int(df.loc['lights_off', v])])
+            self.lightson_menu.set(df.loc['lights_on', v])
+            self.lightsoff_menu.set(df.loc['lights_off', v])
             self.drink_showleft_val.set(df.loc['show_left', v])
             self.drink_showright_val.set(df.loc['show_right', v])
             self.drink_showcontent_val.set(df.loc['show_content_val', v])
+            self.drink_binsize_menu.set(df.loc['binsize', v])
             s = pd.to_datetime(df.loc['dfilter_sdate', v])
             e = pd.to_datetime(df.loc['dfilter_edate', v])
             if str(self.dfilter_s_date.cget('state')) == 'disabled':
@@ -961,8 +1040,8 @@ class SipperViz(tk.Tk):
                 self.dfilter_e_date.configure(state='disabled')
             else:
                 self.dfilter_e_date.set_date(e)
-            self.dfilter_s_hour.set(self.times[int(df.loc['dfilter_shour', v])])
-            self.dfilter_e_hour.set(self.times[int(df.loc['dfilter_ehour', v])])
+            self.dfilter_s_hour.set(df.loc['dfilter_shour', v])
+            self.dfilter_e_hour.set(df.loc['dfilter_ehour', v])
 
 
     def set_date_filter_state(self):
@@ -1071,6 +1150,7 @@ class SipperViz(tk.Tk):
         if files:
             for f in files:
                 f.assign_contents(d)
+                f.sipperviz_assigned = True
         self.close_content_window()
         self.display_details()
         self.update_avail_contents()
@@ -1146,7 +1226,7 @@ class SipperViz(tk.Tk):
     def on_close(self):
         settings_dir = 'memory/settings'
         if os.path.isdir(settings_dir):
-            settings_df = self.get_all_settings_df()
+            settings_df = self.get_settings_df()
             settings_df.to_csv(os.path.join(settings_dir, 'LAST_USED.csv'))
         self.destroy()
         self.quit()

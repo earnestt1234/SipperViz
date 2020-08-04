@@ -14,18 +14,32 @@ t4 = pd.Timestamp(year=2020, month=3, day=4, hour=4)
 
 s = sipper.Sipper(path)
 s.assign_contents({(t1,t2):("Water","Oxy"),
-                   (t2,t3):("Oxy","Water"),
-                   (t3,t4):('Water',"Oxy")})
+                    (t2,t3):("Oxy","Water"),
+                    (t3,t4):('Water',"Oxy")})
 d = s.data
 
-t = sipper.Sipper(path2)
-g = t.data
+sipperplots.drinkcount_binned(s, show_right=False)
 
-import matplotlib.pyplot as plt
+def groupby_getcontentdict(d):
+    t1 = d.index.min()
+    t2 = d.index.max()
+    s1 = d['LeftContents'].unique()[0]
+    s2 = d['RightContents'].unique()[0]
+    return {(t1, t2):(s1, s2)}
 
-fig, ax = plt.subplots()
-sipperplots.drinkcount_cumulative(s, ax=ax, show_content=['Oxy'])
-output = sipperplots.get_line_data(ax)
+def get_contents_dict(d):
+    d = d.dropna(subset=['LeftContents', 'RightContents']).copy()
+    l = d['LeftContents'].ne(d['LeftContents'].shift().bfill())
+    r = d['RightContents'].ne(d['RightContents'].shift().bfill())
+    changes = (l|r).astype(int).cumsum()
+    groupdict = d.groupby(changes).apply(groupby_getcontentdict).to_dict()
+    output = {}
+    for i in groupdict.values():
+        print(i)
+        output.update(i)
+    return output
+
+x = get_contents_dict(d)
 
 #%%
 import tkinter as tk

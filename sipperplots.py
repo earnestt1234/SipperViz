@@ -312,6 +312,42 @@ def drinkcount_cumulative(sipper, show_left=True, show_right=True,
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
+def drinkcount_binned(sipper, binsize='1H', show_left=True, show_right=True,
+                      show_content=[], shade_dark=True,
+                      lights_on=7, lights_off=19, **kwargs):
+    if 'ax' in kwargs:
+        ax = kwargs['ax']
+    else:
+        fig, ax = plt.subplots()
+    df = sipper.data.copy()
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    if show_left:
+        l = df['LeftCount'].diff().resample(binsize).sum()
+        ax.plot(l.index, l, color='red',
+                label=sipper.left_name)
+    if show_right:
+        r = df['RightCount'].diff().resample(binsize).sum()
+        ax.plot(r.index, r, color='blue',
+                label=sipper.right_name)
+    if show_content:
+        for c in show_content:
+            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            binned = count.diff().resample(binsize).sum()
+            if not count.empty:
+                ax.plot(binned.index, binned, label=c)
+    date_format_x(ax, df.index[0], df.index[-1])
+    ax.set_title('Drink Count for ' + sipper.filename)
+    ax.set_ylabel('Drinks')
+    ax.set_xlabel('Date')
+    if shade_dark:
+        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
 def drinkduration_cumulative(sipper, show_left=True, show_right=True,
                              show_content=[], shade_dark=True,
                              lights_on=7, lights_off=19, **kwargs):
@@ -344,6 +380,45 @@ def drinkduration_cumulative(sipper, show_left=True, show_right=True,
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
+
+def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
+                         show_content=[], shade_dark=True,
+                         lights_on=7, lights_off=19, **kwargs):
+    if 'ax' in kwargs:
+        ax = kwargs['ax']
+    else:
+        fig, ax = plt.subplots()
+    df = sipper.data.copy()
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    if show_left:
+        l = df['LeftDuration'].diff().resample(binsize).sum()
+        ax.plot(l.index, l, color='red',
+                label=sipper.left_name)
+    if show_right:
+        r = df['RightDuration'].diff().resample(binsize).sum()
+        ax.plot(r.index, r, color='blue',
+                label=sipper.right_name)
+    if show_content:
+        for c in show_content:
+            count = sipper.get_content_values(c, out='Duration', df=sipper.data)
+            binned = count.diff().resample(binsize).sum()
+            if not count.empty:
+                ax.plot(binned.index, binned, label=c)
+    date_format_x(ax, df.index[0], df.index[-1])
+    ax.set_title('Drink Duration for ' + sipper.filename)
+    ax.set_ylabel('Drink Duration (s)')
+    ax.set_xlabel('Date')
+    if shade_dark:
+        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
+def interdrink_intervals(sippers, kde=True, logx=False):
+    pass
 
 #---data return functions
 
