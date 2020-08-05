@@ -1,6 +1,5 @@
 """Class for loading sipper data."""
 
-from collections import OrderedDict
 import os
 import warnings
 

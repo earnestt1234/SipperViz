@@ -7,6 +7,9 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+
+#---dates and shading
 
 def date_filter_okay(df, start, end):
     check = df[(df.index >= start) &
@@ -277,6 +280,28 @@ def date_format_x(ax, start, end):
     ax.xaxis.set_major_formatter(xfmt)
     ax.xaxis.set_minor_locator(minor)
 
+#---interdrink intervals
+def get_any_idi(data):
+    combined = data['LeftCount'].diff() + data['RightCount'].diff()
+    combined.dropna(inplace=True)
+    combined = combined[combined > 0]
+    idi_delta = combined.index.to_series().diff().dropna()
+    idi_minutes = idi_delta.dt.total_seconds()/60
+    return idi_minutes
+
+def setup_idi_axes(ax, logx):
+    ax.set_xlabel('Minutes Between Drinks')
+    ax.set_title('Interdrink Interval Plot')
+    if logx:
+        lowest = -2
+        highest = 5
+        ax.set_xticks(range(lowest,highest))
+        ax.set_xticklabels([10**num for num in range(-2,5)], rotation=45)
+        ax.set_xlim(-2.5, 5.1)
+    else:
+        ax.set_xticks([0,300,600,900])
+        ax.set_xlim(-100,1000)
+
 #---plotting functions
 
 def drinkcount_cumulative(sipper, show_left=True, show_right=True,
@@ -417,19 +442,36 @@ def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
-def interdrink_intervals(sippers, kde=True, logx=False):
-    pass
-
-#---data return functions
-
-def get_line_data(ax):
-    output = pd.DataFrame()
-    lines, labels = ax.get_legend_handles_labels()
-    zipped = zip(lines, labels)
-    for line, label in zipped:
-        if not isinstance(line, mpl.lines.Line2D):
-            continue
-        x, y = line.get_data()
-        temp = pd.DataFrame({label : y}, index=x)
-        output = output.join(temp, how='outer')
-    return output
+def interdrink_intervals(sippers, kde=True, logx=True,
+                         combine=False, **kwargs):
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots(figsize=(4,5), dpi=125)
+    else:
+        ax = kwargs['ax']
+    setup_idi_axes(ax, logx)
+    combined = []
+    for sipper in sippers:
+        df = sipper.data.copy()
+        if 'date_filter' in kwargs:
+            s, e = kwargs['date_filter']
+            df = df[(df.index >= s) &
+                    (df.index <= e)].copy()
+        y = get_any_idi(df)
+        if logx:
+            y = [np.log10(val) for val in y if not pd.isna(val)]
+            bins = np.round(np.arange(-2, 5, .1), 2)
+        else:
+            bins = np.linspace(0, 900, 50)
+        if combine:
+            combined += list(y)
+        else:
+            sns.distplot(y, bins=bins, label=sipper.filename, ax=ax, norm_hist=False,
+                         kde=kde)
+    if combined:
+        sns.distplot(combined, bins=bins, ax=ax, norm_hist=False, kde=kde)
+    else:
+        ax.legend(fontsize=8)
+    ylabel = 'Density Estimation' if kde else 'Count'
+    ax.set_ylabel(ylabel)
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None

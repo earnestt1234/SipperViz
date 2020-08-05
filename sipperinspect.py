@@ -10,7 +10,6 @@ import sipperplots
 
 imports = """# importing libraries (may be redundant):
 
-from collections import OrderedDict
 import datetime
 import os
 import warnings
@@ -21,6 +20,7 @@ import numpy as np
 import pandas as pd
 from pandas import Timestamp
 from pandas.plotting import register_matplotlib_converters
+import seaborn as sns
 
 register_matplotlib_converters()
 
@@ -31,14 +31,11 @@ plt.style.use('seaborn-whitegrid')
 # relate each function name to its function from sipperplots
 func_dict = {name:func for name, func in inspect.getmembers(sipperplots)}
 
-# create lists of plots grouped by helper functions needed
-shade_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
-date_format_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
-
 #create a list of arguments that need to be formatted as a string
 string_args = ['binsize']
 
 # create strings of the helper function code
+shade_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
 shade_help = '# shading dark periods\n\n'
 shade_help += inspect.getsource(sipperplots.convert_dt64_to_dt) + '\n'
 shade_help += inspect.getsource(sipperplots.hours_between) + '\n'
@@ -46,8 +43,14 @@ shade_help += inspect.getsource(sipperplots.is_day_or_night) + '\n'
 shade_help += inspect.getsource(sipperplots.night_intervals) + '\n'
 shade_help += inspect.getsource(sipperplots.shade_darkness) + '\n'
 
+date_format_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
 date_format_help = '# formatting date x-axis\n\n'
 date_format_help += inspect.getsource(sipperplots.date_format_x) + '\n'
+
+idi_funcs = ['interdrink_intervals']
+idi_help = '# interdrink intervals\n\n'
+idi_help += inspect.getsource(sipperplots.get_any_idi) + '\n'
+idi_help += inspect.getsource(sipperplots.setup_idi_axes) + '\n'
 
 def add_quotes(string):
     output = '"' + string + '"'
@@ -79,6 +82,8 @@ def generate_code(sipper_plot):
         output += shade_help
     if funcname in date_format_funcs:
         output += date_format_help
+    if funcname in idi_funcs:
+        output += idi_help
 
     # plotting function
     output += '# plotting function\n'
@@ -105,7 +110,16 @@ def generate_code(sipper_plot):
                 d = sipper_plot.content_dicts[s]
                 output += arg + '.assign_contents({})\n'.format(d)
         elif arg == 'sippers':
-            pass
+            sipper_list = []
+            for i, s in enumerate(used_args[arg]):
+                variable = 'sipper{}'.format(i)
+                sipper_list.append(variable)
+                output += variable + ' = ' + str(s) + '\n'
+                if sipper_plot.content_dicts[s]:
+                    d = sipper_plot.content_dicts[s]
+                    output += variable + '.assign_contents({})\n'.format(d)
+            var_list = '\nsippers = ' + '[%s]' % ', '.join(map(str, sipper_list)) + '\n'
+            output += var_list
         else:
             formatted = str(used_args[arg])
             if arg in string_args:
