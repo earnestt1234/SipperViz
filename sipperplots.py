@@ -1,5 +1,6 @@
 """Functions for plotting sipper data."""
 
+from collections import defaultdict
 import datetime
 
 import matplotlib as mpl
@@ -7,6 +8,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
 import seaborn as sns
 
 #---dates and shading
@@ -281,11 +283,31 @@ def date_format_x(ax, start, end):
     ax.xaxis.set_minor_locator(minor)
 
 #---interdrink intervals
-def get_any_idi(data):
+def get_any_idi(sipper):
+    data = sipper.data
     combined = data['LeftCount'].diff() + data['RightCount'].diff()
     combined.dropna(inplace=True)
     combined = combined[combined > 0]
     idi_delta = combined.index.to_series().diff().dropna()
+    idi_minutes = idi_delta.dt.total_seconds()/60
+    return idi_minutes
+
+def get_side_idi(sipper, side):
+    data = sipper.data
+    col = 'LeftCount' if side.lower() == 'left' else 'RightCount'
+    diff = data[col].diff().dropna()
+    diff = diff[diff > 0]
+    idi_delta = diff.index.to_series().diff().dropna()
+    idi_minutes = idi_delta.dt.total_seconds()/60
+    return idi_minutes
+
+def get_content_idi(sipper, content, df):
+    vals = sipper.get_content_values(content, out='Count', df=df)
+    if vals.empty:
+        return vals
+    diff = vals.diff().dropna()
+    diff = diff[diff > 0]
+    idi_delta = diff.index.to_series().diff().dropna()
     idi_minutes = idi_delta.dt.total_seconds()/60
     return idi_minutes
 
@@ -301,6 +323,19 @@ def setup_idi_axes(ax, logx):
     else:
         ax.set_xticks([0,300,600,900])
         ax.set_xlim(-100,1000)
+
+#---circadian
+def get_chronogram_vals(series, lights_on, lights_off):
+    diff = series.diff()
+    byhour = diff.groupby([diff.index.hour]).sum()
+    byhourday = diff.groupby([diff.index.hour, diff.index.date])
+    num_days_by_hour = byhourday.sum().index.get_level_values(0).value_counts()
+    byhour = byhour.divide(num_days_by_hour, axis=0)
+    new_index = list(range(lights_on, 24)) + list(range(0,lights_on))
+    reindexed = byhour.reindex(new_index)
+    reindexed.index.name = 'hour'
+    reindexed = reindexed.fillna(0)
+    return reindexed
 
 #---plotting functions
 
@@ -324,7 +359,7 @@ def drinkcount_cumulative(sipper, show_left=True, show_right=True,
                 label=sipper.right_name)
     if show_content:
         for c in show_content:
-            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            count = sipper.get_content_values(c, out='Count', df=df)
             if not count.empty:
                 ax.plot(count.index, count, drawstyle='steps', label=c)
     date_format_x(ax, df.index[0], df.index[-1])
@@ -359,7 +394,7 @@ def drinkcount_binned(sipper, binsize='1H', show_left=True, show_right=True,
                 label=sipper.right_name)
     if show_content:
         for c in show_content:
-            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            count = sipper.get_content_values(c, out='Count', df=df)
             binned = count.diff().resample(binsize).sum()
             if not count.empty:
                 ax.plot(binned.index, binned, label=c)
@@ -393,7 +428,7 @@ def drinkduration_cumulative(sipper, show_left=True, show_right=True,
                 label=sipper.right_name)
     if show_content:
         for c in show_content:
-            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            count = sipper.get_content_values(c, out='Count', df=df)
             if not count.empty:
                 ax.plot(count.index, count, drawstyle='steps', label=c)
     date_format_x(ax, df.index[0], df.index[-1])
@@ -428,7 +463,7 @@ def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
                 label=sipper.right_name)
     if show_content:
         for c in show_content:
-            count = sipper.get_content_values(c, out='Duration', df=sipper.data)
+            count = sipper.get_content_values(c, out='Duration', df=df)
             binned = count.diff().resample(binsize).sum()
             if not count.empty:
                 ax.plot(binned.index, binned, label=c)
@@ -445,7 +480,7 @@ def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
 def interdrink_intervals(sippers, kde=True, logx=True,
                          combine=False, **kwargs):
     if 'ax' not in kwargs:
-        fig, ax = plt.subplots(figsize=(4,5), dpi=125)
+        fig, ax = plt.subplots()
     else:
         ax = kwargs['ax']
     setup_idi_axes(ax, logx)
@@ -456,7 +491,7 @@ def interdrink_intervals(sippers, kde=True, logx=True,
             s, e = kwargs['date_filter']
             df = df[(df.index >= s) &
                     (df.index <= e)].copy()
-        y = get_any_idi(df)
+        y = get_any_idi(sipper)
         if logx:
             y = [np.log10(val) for val in y if not pd.isna(val)]
             bins = np.round(np.arange(-2, 5, .1), 2)
@@ -474,4 +509,173 @@ def interdrink_intervals(sippers, kde=True, logx=True,
     ylabel = 'Density Estimation' if kde else 'Count'
     ax.set_ylabel(ylabel)
     plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
+def interdrink_intervals_byside(sippers, kde=True, logx=True, **kwargs):
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    setup_idi_axes(ax, logx)
+    colors = {'Left' : 'red',
+              'Right' : 'blue'}
+    for side in ['Left', 'Right']:
+        combined = []
+        for sipper in sippers:
+            df = sipper.data.copy()
+            if 'date_filter' in kwargs:
+                s, e = kwargs['date_filter']
+                df = df[(df.index >= s) &
+                        (df.index <= e)].copy()
+            y = get_side_idi(sipper, side)
+            if logx:
+                y = [np.log10(val) for val in y if not pd.isna(val)]
+                bins = np.round(np.arange(-2, 5, .1), 2)
+            else:
+                bins = np.linspace(0, 900, 50)
+            combined += list(y)
+        sns.distplot(combined, bins=bins, label=side, ax=ax, norm_hist=False,
+                     kde=kde, color=colors[side])
+    ax.legend(fontsize=8)
+    ylabel = 'Density Estimation' if kde else 'Count'
+    ax.set_ylabel(ylabel)
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
+def interdrink_intervals_bycontent(sippers, show_content, kde=True, logx=True, **kwargs):
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    setup_idi_axes(ax, logx)
+    for c in show_content:
+        combined = []
+        for sipper in sippers:
+            df = sipper.data.copy()
+            if 'date_filter' in kwargs:
+                s, e = kwargs['date_filter']
+                df = df[(df.index >= s) &
+                        (df.index <= e)].copy()
+            y = get_content_idi(sipper, c, df=df)
+            if logx:
+                y = [np.log10(val) for val in y if not pd.isna(val)]
+                bins = np.round(np.arange(-2, 5, .1), 2)
+            else:
+                bins = np.linspace(0, 900, 50)
+            combined += list(y)
+        sns.distplot(combined, bins=bins, label=c, ax=ax, norm_hist=False,
+                     kde=kde)
+    ax.legend(fontsize=8)
+    ylabel = 'Density Estimation' if kde else 'Count'
+    ax.set_ylabel(ylabel)
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
+def drinkcount_chronogram(sipper, circ_left=True, circ_right=True,
+                          circ_content=None, lights_on=7,
+                          lights_off=19, shade_dark=True, **kwargs):
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    df = sipper.data
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    to_plot = []
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    labels = []
+    if circ_left:
+        to_plot.append(df['LeftCount'])
+        colors.insert(0, 'red')
+        labels.append('Left')
+    if circ_right:
+        to_plot.append(df['RightCount'])
+        colors.insert(0, 'blue')
+        labels.append('Right')
+    if circ_content:
+        for c in circ_content:
+            vals = sipper.get_content_values(c, 'Count', df=df)
+            if not vals.empty:
+                to_plot.append(vals)
+                labels.append(c)
+    for i, series in enumerate(to_plot):
+        reindexed = get_chronogram_vals(series, lights_on, lights_off)
+        label = labels[i]
+        ax.plot(range(0,24), reindexed, color=colors[i], label=label)
+    ax.set_xlabel('Hours Into Light Cycle')
+    ax.set_xticks([0,6,12,18,24])
+    ax.set_ylabel('Drinks')
+    ax.set_title('Chronogram')
+    if shade_dark:
+        new_index = list(range(lights_on, 24)) + list(range(0,lights_on))
+        off = new_index.index(lights_off)
+        ax.axvspan(off,24,color='gray',alpha=.2,zorder=0,label='lights off')
+    ax.legend()
+    plt.tight_layout()
+
+    return fig if 'ax' not in kwargs else None
+
+def drinkcount_chronogram_grouped(sippers, groups, circ_left=True, circ_right=True,
+                                  circ_content=None, circ_var='SEM', lights_on=7,
+                                  lights_off=19, shade_dark=True, **kwargs):
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    to_plot = defaultdict(list)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if circ_left:
+                    key = group + ' - Left'
+                    vals = get_chronogram_vals(df['LeftCount'],
+                                               lights_on,
+                                               lights_off)
+                    to_plot[key].append(vals)
+                if circ_right:
+                    key = group + ' - Right'
+                    vals = get_chronogram_vals(df['RightCount'],
+                                               lights_on,
+                                               lights_off)
+                    to_plot[key].append(vals)
+                if circ_content:
+                    for c in circ_content:
+                        key = group + ' - ' + c
+                        content_vals = sipper.get_content_values(c, 'Count', df)
+                        if not content_vals.empty:
+                            vals = get_chronogram_vals(content_vals,
+                                                       lights_on,
+                                                       lights_off)
+                            to_plot[key].append(vals)
+    for i, (label, data) in enumerate(to_plot.items()):
+        x = range(0,24)
+        y = np.nanmean(data, axis=0)
+        error_shade = np.nan
+        if circ_var == 'raw':
+            for d in data:
+                ax.plot(x, d, color=colors[i], alpha=.3,linewidth=.8)
+        if circ_var == 'SEM':
+            error_shade = stats.sem(data, axis=0, nan_policy='omit')
+        ax.plot(x, y, color=colors[i], label=label)
+        ax.fill_between(x, y-error_shade, y+error_shade, color=colors[i],
+                        alpha=.3)
+    ax.set_xlabel('Hours Into Light Cycle')
+    ax.set_xticks([0,6,12,18,24])
+    ax.set_ylabel('Drinks')
+    ax.set_title('Chronogram')
+    if shade_dark:
+        new_index = list(range(lights_on, 24)) + list(range(0,lights_on))
+        off = new_index.index(lights_off)
+        ax.axvspan(off,24,color='gray',alpha=.2,zorder=0,label='lights off')
+    ax.legend()
+    plt.tight_layout()
+
     return fig if 'ax' not in kwargs else None

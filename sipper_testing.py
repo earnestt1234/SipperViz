@@ -23,13 +23,13 @@ d = s.data
 
 s2 = sipper.Sipper(path2)
 
-sipperplots.interdrink_intervals([s, s2], combine=False, kde=True)
+sippers = [s, s2]
+for i in sippers:
+    i.groups.append('One')
 
-b,k = plotdata.interdrink_intervals([s, s2], combine=False, kde=True)
+# sipperplots.drinkcount_chronogram(s2, circ_content=['Oxy'])
 
-#%%
+# sipperplots.drinkcount_chronogram_grouped(sippers, groups=['One'], circ_var='raw',
+#                                           circ_content=['Oxy'])
 
-import seaborn as sns, numpy as np
-sns.set(); np.random.seed(0)
-x = np.random.randn(100)
-ax = sns.distplot(x)
+k = plotdata.drinkcount_chronogram(s2, circ_content=['Oxy'])

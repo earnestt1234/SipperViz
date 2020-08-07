@@ -95,7 +95,13 @@ class SipperViz(tk.Tk):
             sipperplots.drinkduration_binned:
                 'Drink Duration (Binned)',
             sipperplots.interdrink_intervals:
-                'Interdrink Intervals'}
+                'Interdrink Intervals',
+            sipperplots.interdrink_intervals_byside:
+                'Interdrink Intervals (By Side)',
+            sipperplots.interdrink_intervals_bycontent:
+                'Interdrink Intervals (By Content)',
+            sipperplots.drinkcount_chronogram:
+                'Chronogram (Drink Count)'}
         self.plot_names_to_funcs = {v:k for k,v in self.plot_default_names.items()}
 
         #link each plot to its function for retrieving data
@@ -109,11 +115,14 @@ class SipperViz(tk.Tk):
                 sipperplots.drinkcount_cumulative,
                 sipperplots.drinkcount_binned,
                 sipperplots.drinkduration_cumulative,
-                sipperplots.drinkduration_binned,]:
+                sipperplots.drinkduration_binned,
+                sipperplots.drinkcount_chronogram]:
             self.plot_routes[func] = self.iter_plot
 
         for func in [
-                sipperplots.interdrink_intervals
+                sipperplots.interdrink_intervals,
+                sipperplots.interdrink_intervals_byside,
+                sipperplots.interdrink_intervals_bycontent
                 ]:
             self.plot_routes[func] = self.combo_plot
 
@@ -135,6 +144,7 @@ class SipperViz(tk.Tk):
     #---data management
         self.loaded_sippers = []
         self.loaded_plots = OrderedDict()
+        self.loaded_groups = []
         self.avail_contents = []
 
     #---load button images
@@ -307,6 +317,37 @@ class SipperViz(tk.Tk):
         self.logx_box.grid(row=2, column=0, sticky='nsew', padx=20, pady=5)
         self.combine_idi_box.grid(row=3, column=0, sticky='nsew', padx=20, pady=5)
 
+        #circadian
+        self.circ_settings = tk.Frame(self.plot_settings_window)
+        self.plot_settings_tabs.add(self.circ_settings,
+                                    text='Circadian')
+        s1 = 'The following settings affect the Chronogram (Drink Count) plots'
+        s2 = ''
+        s3 = ''
+        text = s1 + s2 + s3
+        self.circ_settings_label = tk.Label(self.circ_settings, text=text,
+                                            wraplength=600, justify='left')
+        self.circ_showleft_val = tk.BooleanVar()
+        self.circ_showleft_val.set(True)
+        self.circ_showleft_box = ttk.Checkbutton(self.circ_settings,
+                                                  variable=self.circ_showleft_val,
+                                                  text='Show left sipper')
+        self.circ_showright_val = tk.BooleanVar()
+        self.circ_showright_val.set(True)
+        self.circ_showright_box = ttk.Checkbutton(self.circ_settings,
+                                                   variable=self.circ_showright_val,
+                                                   text='Show right sipper')
+        self.circ_showcontent_val = tk.BooleanVar()
+        self.circ_showcontent_val.set(True)
+        self.circ_showcontent_box = ttk.Checkbutton(self.circ_settings,
+                                                     variable=self.circ_showcontent_val,
+                                                     text='Show contents (see Content tab)')
+        self.circ_settings_label.grid(row=0, column=0, sticky='nsew', padx=20, pady=5,
+                                       columnspan=2)
+        self.circ_showleft_box.grid(row=1, column=0, sticky='w', padx=20, pady=5)
+        self.circ_showright_box.grid(row=2, column=0, sticky='w', padx=20, pady=5)
+        self.circ_showcontent_box.grid(row=3, column=0, sticky='w', padx=20, pady=5)
+
     #---create general settings window
         self.general_settings = tk.Toplevel(self)
         self.general_settings.withdraw()
@@ -449,9 +490,14 @@ class SipperViz(tk.Tk):
         self.makeplot_selection.insert(self.makeplot_drinks, 2, text='Drink Count (Binned)')
         self.makeplot_selection.insert(self.makeplot_drinks, 3, text='Drink Duration (Cumulative)')
         self.makeplot_selection.insert(self.makeplot_drinks, 4, text='Drink Duration (Binned)')
-        self.makeplot_idi = self.makeplot_selection.insert('', 2, text='Interdrink Intervals',
+        self.makeplot_idi = self.makeplot_selection.insert('', 2, text='IDI',
                                                            open=True)
         self.makeplot_selection.insert(self.makeplot_idi, 1, text='Interdrink Intervals')
+        self.makeplot_selection.insert(self.makeplot_idi, 2, text='Interdrink Intervals (By Side)')
+        self.makeplot_selection.insert(self.makeplot_idi, 3, text='Interdrink Intervals (By Content)')
+        self.makeplot_circ = self.makeplot_selection.insert('', 3, text='Circadian',
+                                                            open=True)
+        self.makeplot_selection.insert(self.makeplot_circ, 1, text='Chronogram (Drink Count)')
         self.makeplot_selection.bind('<<TreeviewSelect>>', self.update_makeplot_run)
         self.makeplot_scroll = ttk.Scrollbar(self.makeplot_selectionframe,
                                              command=self.makeplot_selection.yview,)
@@ -467,6 +513,45 @@ class SipperViz(tk.Tk):
         self.makeplot_selectionframe.grid(row=0, column=0, sticky='nsew', columnspan=2)
         self.makeplot_run_button.grid(row=1, column=0, sticky='nsew')
         self.makeplot_cancel_button.grid(row=1, column=1, sticky='nsew')
+
+    #---create groups window
+        self.groups_window = tk.Toplevel(self)
+        self.groups_window.resizable(False, True)
+        self.groups_window.withdraw()
+        self.groups_window.title('Group Manager')
+        self.groups_window.protocol("WM_DELETE_WINDOW",
+                                    self.groups_window.withdraw)
+
+    #---populate groups window
+        self.groupview_frame = tk.Frame(self.groups_window)
+        self.groupview = ttk.Treeview(self.groupview_frame, height=12)
+        self.groupview.heading('#0', text='Groups')
+        self.groupview.column('#0', width=230)
+        self.groupview_scroll = ttk.Scrollbar(self.groupview_frame,
+                                              command=self.groupview.yview,)
+        self.groupview.configure(yscrollcommand=self.groupview_scroll.set)
+        self.groupview_frame.grid_rowconfigure(0,weight=1)
+        self.groupview.grid(row=0, column=0, sticky='nsw')
+        self.groupview_scroll.grid(row=0,column=1,sticky='nsw')
+
+        self.group_create = tk.Button(self.groups_window, text='Create Group',
+                                      command=self.create_group)
+        self.group_add = tk.Button(self.groups_window, text='Add Files to Group')
+        self.group_remove = tk.Button(self.groups_window, text='Remove Files from Group')
+        self.group_select = tk.Button(self.groups_window, text='Select Files in these Groups')
+        self.group_delete = tk.Button(self.groups_window, text='Delete Group')
+        self.group_save = tk.Button(self.groups_window, text='Save Groups')
+        self.group_load = tk.Button(self.groups_window, text='Load Groups')
+
+        self.groupview_frame.grid(row=0, column=0, sticky='nsew')
+        self.groups_window.grid_rowconfigure(0, weight=1)
+        self.group_create.grid(row=1, column=0, sticky='nsew')
+        self.group_add.grid(row=2, column=0, sticky='nsew')
+        self.group_remove.grid(row=3, column=0, sticky='nsew')
+        self.group_select.grid(row=4, column=0, sticky='nsew')
+        self.group_delete.grid(row=5, column=0, sticky='nsew')
+        self.group_save.grid(row=6, column=0, sticky='nsew')
+        self.group_load.grid(row=7, column=0, sticky='nsew')
 
     #---create treeview panes (left sash)
         self.left_sash = ttk.PanedWindow(self.main_frame, orient='vertical')
@@ -492,6 +577,13 @@ class SipperViz(tk.Tk):
         self.plotmenu.add_separator()
         self.plotmenu.add_command(label='Interdrink Intervals', command=lambda:
                                   self.combo_plot(sipperplots.interdrink_intervals))
+        self.plotmenu.add_command(label='Interdrink Intervals (By Side)', command=lambda:
+                                  self.combo_plot(sipperplots.interdrink_intervals_byside))
+        self.plotmenu.add_command(label='Interdrink Intervals (By Content)', command=lambda:
+                                  self.combo_plot(sipperplots.interdrink_intervals_bycontent))
+        self.plotmenu.add_separator()
+        self.plotmenu.add_command(label='Chronogram (Drink Count)', command=lambda:
+                                  self.iter_plot(sipperplots.drinkcount_chronogram))
         self.menubar.add_cascade(menu=self.plotmenu, label='Plot')
 
     #---create buttons
@@ -512,7 +604,7 @@ class SipperViz(tk.Tk):
                                        image=self.icons['paperclip'],
                                        text='Groups', compound='top',
                                        borderwidth=0,
-                                       command=print,
+                                       command=self.groups_window.deiconify,
                                        width=40)
         self.concat_button = tk.Button(self.button_frame,
                                        image=self.icons['tack'],
@@ -717,6 +809,7 @@ class SipperViz(tk.Tk):
                 except:
                     tb = traceback.format_exc()
                     print(tb)
+                self.update()
             self.update_file_view()
             self.update_avail_contents()
             self.update_all_buttons()
@@ -912,14 +1005,24 @@ class SipperViz(tk.Tk):
             self.plot_info.insert('','end', text='date filter : False')
 
     def is_plottable(self, graphname):
-        val = False
-        if graphname in ['Drink Count (Cumulative)',
-                         'Drink Duration (Cumulative)',
-                         'Drink Count (Binned)',
-                         'Drink Duration (Binned)']:
+        plottable = False
+        if graphname in [
+                'Drink Count (Cumulative)',
+                'Drink Duration (Cumulative)',
+                'Drink Count (Binned)',
+                'Drink Duration (Binned)',
+                'Interpellet Intervals',
+                'Interpellet Intervals (By Side)',
+                'Chronogram (Drink Count)'
+                ]:
             if self.file_view.selection():
-                val = True
-        return val
+                plottable = True
+        if graphname in [
+                'Interpellet Intervals (By Content)'
+                ]:
+            if self.contentselect.selection():
+                plottable = True
+        return plottable
 
     def raise_makeplot_window(self):
         self.makeplot_window.deiconify()
@@ -1065,6 +1168,51 @@ class SipperViz(tk.Tk):
                         final = self.create_file_name(full_save)
                         data.to_csv(final)
 
+    #---group functions
+    def create_group(self):
+        self.create_window = tk.Toplevel(self)
+        self.create_window.title('Enter a group name')
+        self.create_name = tk.StringVar()
+        self.create_name.set('')
+        self.create_name.trace_add('write',self.create_group_check)
+        self.warning_var = tk.StringVar()
+        self.warning_var.set('')
+        warning_label = tk.Label(self.create_window,
+                                 textvariable=self.warning_var)
+        entry = tk.Entry(self.create_window,
+                         textvariable=self.create_name,
+                         width=50)
+        self.ok_button_create = tk.Button(self.create_window,text='OK',
+                                          command=lambda: self.create_okay(),
+                                          state=tk.DISABLED)
+        cancel_button = tk.Button(self.create_window,
+                                  text='Cancel',
+                                  command=self.create_window.destroy)
+        warning_label.grid(row=0,column=0, sticky='w',
+                           columnspan=2,padx=(20,0),pady=(20,0))
+        entry.grid(row=1,column=0,sticky='ew',padx=(20,20),pady=(20,0),
+                   columnspan=2)
+        self.ok_button_create.grid(row=2,column=0,sticky='ew',padx=(20,20),pady=(20,20))
+        cancel_button.grid(row=2,column=1,sticky='ew',padx=(20,20),pady=(20,20))
+
+    def create_okay(self):
+        group_name = self.create_name.get()
+        self.loaded_groups.append(group_name)
+        self.groupview.insert('', 'end', text=group_name)
+        self.create_window.destroy()
+
+    def create_group_check(self, *args):
+        new_name = self.create_name.get()
+        if new_name == '':
+            self.ok_button_create.configure(state=tk.DISABLED)
+        else:
+            if new_name in self.loaded_groups:
+                self.warning_var.set('Group already in use!')
+                self.ok_button_create.configure(state=tk.DISABLED)
+            else:
+                self.warning_var.set('')
+                self.ok_button_create.configure(state=tk.NORMAL)
+
     #---settings functions
     def get_settings_dict(self):
         settings_dict = dict(dfilter_val     =self.date_filter_val.get(),
@@ -1081,16 +1229,19 @@ class SipperViz(tk.Tk):
                              binsize         =self.drink_binsize_menu.get(),
                              kde             =self.kde_val.get(),
                              logx            =self.logx_val.get(),
-                             combine         =self.combine_idi_val.get())
+                             combine         =self.combine_idi_val.get(),
+                             circ_left       =self.circ_showleft_val.get(),
+                             circ_right      =self.circ_showright_val.get(),
+                             circ_content    =self.circ_showcontent_val.get())
         return settings_dict
 
     def get_settings_dict_as_args(self):
-        if self.drink_showcontent_val.get():
-            drink_content = list(self.contentselect.selection())
-        else:
-            drink_content = []
         settings_dict = self.get_settings_dict()
+        selected_contents = list(self.contentselect.selection())
+        drink_content = selected_contents if self.drink_showcontent_val.get() else []
+        circ_content = selected_contents if self.circ_showcontent_val.get() else []
         settings_dict['show_content'] = drink_content
+        settings_dict['circ_content'] = circ_content
         for time_setting in ['lights_on','lights_off']:
             settings_dict[time_setting] = self.times_to_int[settings_dict[time_setting]]
         for bin_setting in ['binsize']:
@@ -1141,6 +1292,9 @@ class SipperViz(tk.Tk):
                 self.dfilter_e_date.set_date(e)
             self.dfilter_s_hour.set(df.loc['dfilter_shour', v])
             self.dfilter_e_hour.set(df.loc['dfilter_ehour', v])
+            self.circ_showleft_val.set(df.loc['circ_left', v])
+            self.circ_showright_val.set(df.loc['circ_right', v])
+            self.circ_showcontent_val.set(df.loc['circ_content', v])
 
 
     def set_date_filter_state(self):

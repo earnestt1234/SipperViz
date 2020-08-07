@@ -14,3 +14,6 @@ binsize,2 hours
 kde,True
 logx,True
 combine,True
+circ_left,True
+circ_right,True
+circ_content,True

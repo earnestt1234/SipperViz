@@ -9,7 +9,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from sipperplots import get_any_idi
+from sipperplots import (
+    get_any_idi,
+    get_side_idi,
+    get_content_idi,
+    get_chronogram_vals
+        )
 
 def drinkcount_cumulative(sipper, show_left=True, show_right=True,
                           show_content=[], **kwargs):
@@ -27,7 +32,7 @@ def drinkcount_cumulative(sipper, show_left=True, show_right=True,
         output = output.join(r, how='outer')
     if show_content:
         for c in show_content:
-            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            count = sipper.get_content_values(c, out='Count', df=df)
             if not count.empty:
                 temp = pd.DataFrame({c +'Count' : count}, index=count.index)
                 output = output.join(temp, how='outer')
@@ -51,7 +56,7 @@ def drinkcount_binned(sipper, binsize='1H', show_left=True, show_right=True,
         output = output.join(r, how='outer')
     if show_content:
         for c in show_content:
-            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            count = sipper.get_content_values(c, out='Count', df=df)
             binned = count.diff().resample(binsize).sum()
             if not count.empty:
                 temp = pd.DataFrame({c+'Count' : binned}, index=binned.index)
@@ -74,7 +79,7 @@ def drinkduration_cumulative(sipper, show_left=True, show_right=True,
         output = output.join(r, how='outer')
     if show_content:
         for c in show_content:
-            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            count = sipper.get_content_values(c, out='Count', df=df)
             if not count.empty:
                 temp = pd.DataFrame({c+'Duration' : count}, index=count.index)
                 output = output.join(temp, how='outer')
@@ -98,7 +103,7 @@ def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
         output = output.join(r, how='outer')
     if show_content:
         for c in show_content:
-            count = sipper.get_content_values(c, out='Count', df=sipper.data)
+            count = sipper.get_content_values(c, out='Count', df=df)
             binned = count.diff().resample(binsize).sum()
             if not count.empty:
                 temp = pd.DataFrame({c+'Duration' : binned}, index=binned.index)
@@ -125,7 +130,7 @@ def idi_onecurve(sippers, kde, logx, **kwargs):
             s, e = kwargs['date_filter']
             df = df[(df.index >= s) &
                     (df.index <= e)].copy()
-        y = get_any_idi(df)
+        y = get_any_idi(sipper)
         if logx:
             y = [np.log10(val) for val in y if not pd.isna(val)]
             bins = np.round(np.arange(-2, 5, .1), 2)
@@ -159,7 +164,7 @@ def idi_multicurve(sippers, kde, logx, **kwargs):
             s, e = kwargs['date_filter']
             df = df[(df.index >= s) &
                     (df.index <= e)].copy()
-        y = get_any_idi(df)
+        y = get_any_idi(sipper)
         if logx:
             y = [np.log10(val) for val in y if not pd.isna(val)]
             bins = np.round(np.arange(-2, 5, .1), 2)
@@ -180,3 +185,109 @@ def idi_multicurve(sippers, kde, logx, **kwargs):
     bar_df.index.name = 'log10(minutes)' if logx else 'minutes'
     kde_df.index.name = 'log10(minutes)' if logx else 'minutes'
     return bar_df, kde_df
+
+def interdrink_intervals_byside(sippers, kde=True, logx=True, **kwargs):
+    bar_df = pd.DataFrame()
+    kde_df = pd.DataFrame()
+    for side in ['Left', 'Right']:
+        combined = []
+        fig = plt.figure()
+        plt.clf()
+        for sipper in sippers:
+            df = sipper.data.copy()
+            if 'date_filter' in kwargs:
+                s, e = kwargs['date_filter']
+                df = df[(df.index >= s) &
+                        (df.index <= e)].copy()
+            y = get_side_idi(sipper, side)
+            if logx:
+                y = [np.log10(val) for val in y if not pd.isna(val)]
+                bins = np.round(np.arange(-2, 5, .1), 2)
+            else:
+                bins = np.linspace(0, 900, 50)
+            combined += list(y)
+        plot = sns.distplot(combined, bins=bins, norm_hist=False, kde=kde)
+        if kde:
+            if plot.get_lines():
+                line = plot.get_lines()[0]
+                x, y = line.get_data()
+                ktemp = pd.DataFrame({side:y}, index=x)
+                kde_df = kde_df.join(ktemp, how='outer')
+        bar_x = [v.get_x() for v in plot.patches]
+        bar_h = [v.get_height() for v in plot.patches]
+        btemp = pd.DataFrame({side:bar_h}, index=bar_x)
+        bar_df = bar_df.join(btemp, how='outer')
+        plt.close()
+    bar_df.index.name = 'log10(minutes)' if logx else 'minutes'
+    kde_df.index.name = 'log10(minutes)' if logx else 'minutes'
+    return bar_df, kde_df
+
+def interdrink_intervals_bycontent(sippers, show_content, kde=True, logx=True,
+                                   **kwargs):
+    bar_df = pd.DataFrame()
+    kde_df = pd.DataFrame()
+    for c in show_content:
+        combined = []
+        fig = plt.figure()
+        plt.clf()
+        for sipper in sippers:
+            df = sipper.data.copy()
+            if 'date_filter' in kwargs:
+                s, e = kwargs['date_filter']
+                df = df[(df.index >= s) &
+                        (df.index <= e)].copy()
+            y = get_content_idi(sipper, c, df=df)
+            if logx:
+                y = [np.log10(val) for val in y if not pd.isna(val)]
+                bins = np.round(np.arange(-2, 5, .1), 2)
+            else:
+                bins = np.linspace(0, 900, 50)
+            combined += list(y)
+        plot = sns.distplot(combined, bins=bins, norm_hist=False, kde=kde)
+        if kde:
+            if plot.get_lines():
+                line = plot.get_lines()[0]
+                x, y = line.get_data()
+                ktemp = pd.DataFrame({c:y}, index=x)
+                kde_df = kde_df.join(ktemp, how='outer')
+        bar_x = [v.get_x() for v in plot.patches]
+        bar_h = [v.get_height() for v in plot.patches]
+        btemp = pd.DataFrame({c:bar_h}, index=bar_x)
+        bar_df = bar_df.join(btemp, how='outer')
+        plt.close()
+    bar_df.index.name = 'log10(minutes)' if logx else 'minutes'
+    kde_df.index.name = 'log10(minutes)' if logx else 'minutes'
+    return bar_df, kde_df
+
+def drinkcount_chronogram(sipper, circ_left=True, circ_right=True,
+                          circ_content=None, lights_on=7,
+                          lights_off=19, **kwargs):
+    output = pd.DataFrame()
+    df = sipper.data
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    to_plot = []
+    labels = []
+    if circ_left:
+        to_plot.append(df['LeftCount'])
+        labels.append('Left')
+    if circ_right:
+        to_plot.append(df['RightCount'])
+        labels.append('Right')
+    if circ_content:
+        for c in circ_content:
+            vals = sipper.get_content_values(c, 'Count', df=df)
+            if not vals.empty:
+                to_plot.append()
+                labels.append(c)
+    for i, series in enumerate(to_plot):
+        reindexed = get_chronogram_vals(series, lights_on, lights_off)
+        if reindexed.empty:
+            continue
+        label = labels[i]
+        temp = pd.DataFrame({label:reindexed}, index=reindexed.index)
+        output = output.join(temp, how='outer')
+    output.index.name = 'Hours Into Light Cycle'
+    return output

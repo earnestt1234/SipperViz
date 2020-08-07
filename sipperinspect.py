@@ -47,10 +47,17 @@ date_format_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
 date_format_help = '# formatting date x-axis\n\n'
 date_format_help += inspect.getsource(sipperplots.date_format_x) + '\n'
 
-idi_funcs = ['interdrink_intervals']
+idi_funcs = ['interdrink_intervals', 'interdrink_intervals_byside',
+             'interdrink_intervals_bycontent']
 idi_help = '# interdrink intervals\n\n'
 idi_help += inspect.getsource(sipperplots.get_any_idi) + '\n'
+idi_help += inspect.getsource(sipperplots.get_side_idi) + '\n'
+idi_help += inspect.getsource(sipperplots.get_content_idi) + '\n'
 idi_help += inspect.getsource(sipperplots.setup_idi_axes) + '\n'
+
+chrono_funcs = ['drinkcount_chronogram', 'drinkcount_chronogram_grouped']
+chrono_help = '# chronograms\n\n'
+chrono_help += inspect.getsource(sipperplots.get_chronogram_vals) + '\n'
 
 def add_quotes(string):
     output = '"' + string + '"'
@@ -84,6 +91,8 @@ def generate_code(sipper_plot):
         output += date_format_help
     if funcname in idi_funcs:
         output += idi_help
+    if funcname in chrono_funcs:
+        output += chrono_help
 
     # plotting function
     output += '# plotting function\n'
