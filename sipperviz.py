@@ -620,7 +620,6 @@ class SipperViz(tk.Tk):
         self.loading_window = tk.Toplevel(self)
         self.loading_window.resizable(False, False)
         self.loading_window.withdraw()
-        self.loading_window.overrideredirect(1)
         self.loading_window.protocol("WM_DELETE_WINDOW",
                                      self.loading_window.withdraw)
 
