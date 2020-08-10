@@ -5,6 +5,7 @@ from collections import OrderedDict
 import inspect
 import os
 from PIL import Image, ImageTk
+import sys
 import traceback
 import tkinter as tk
 from tkinter import ttk
@@ -167,20 +168,20 @@ class SipperViz(tk.Tk):
         self.avail_groups = []
 
     #---load button images
-        icons = {'gear':"img/settings_icon.gif",
-                 'bottle':'img/bottle_icon.png',
-                 'delete_bottle':'img/delete_bottle.png',
-                 'tack':'img/tack.png',
-                 'paperclip':'img/paperclip.png',
-                 'save':'img/save.png',
-                 'script':'img/script.png',
-                 'spreadsheet':'img/spreadsheet.png',
-                 'graph':'img/graph.png',
-                 'delete_graph':'img/delete_graph.png',
-                 'picture':'img/picture.png',
-                 'palette':'img/palette.png',
-                 'drop':'img/drop.png',
-                 'swap':'img/swap.png'}
+        icons = {'gear':self.imagepath("img/settings_icon.gif"),
+                 'bottle':self.imagepath('img/bottle_icon.png'),
+                 'delete_bottle':self.imagepath('img/delete_bottle.png'),
+                 'tack':self.imagepath('img/tack.png'),
+                 'paperclip':self.imagepath('img/paperclip.png'),
+                 'save':self.imagepath('img/save.png'),
+                 'script':self.imagepath('img/script.png'),
+                 'spreadsheet':self.imagepath('img/spreadsheet.png'),
+                 'graph':self.imagepath('img/graph.png'),
+                 'delete_graph':self.imagepath('img/delete_graph.png'),
+                 'picture':self.imagepath('img/picture.png'),
+                 'palette':self.imagepath('img/palette.png'),
+                 'drop':self.imagepath('img/drop.png'),
+                 'swap':self.imagepath('img/swap.png')}
         self.icons = {}
         for k, v in icons.items():
             image = Image.open(v).resize((25, 25))
@@ -1011,6 +1012,15 @@ class SipperViz(tk.Tk):
     def handle_file_select(self, *event):
         self.display_details()
         self.update_all_buttons()
+
+    def imagepath(self, relative):
+        try:
+            imgpath = os.path.join(os.path.dirname(sys.executable), relative)
+            if not os.path.exists(imgpath):
+                raise Exception
+        except:
+            imgpath = relative
+        return imgpath
 
     #---info pane functions
     def display_details(self, *event):
