@@ -3,10 +3,23 @@
 Tools for SipperViz for inspecting plot code.
 """
 
+import importlib.util
 import inspect
+import os
 
-import sipper
-import sipperplots
+#see here:
+    #https://stackoverflow.com/questions/61379330/problem-with-inspect-using-pyinstaller-can-get-source-of-class-but-not-function
+homedir = os.path.dirname(os.path.realpath(__file__))
+
+location = os.path.join(homedir, 'sipperplots.py')
+spec = importlib.util.spec_from_file_location('sipperplots', location)
+sipperplots = importlib.util.module_from_spec(spec) #my plots module
+spec.loader.exec_module(sipperplots)
+
+location = os.path.join(homedir, 'sipper.py')
+spec = importlib.util.spec_from_file_location("sipper", location)
+sipper = importlib.util.module_from_spec(spec) #my plots module
+spec.loader.exec_module(sipper)
 
 imports = """# importing libraries (may be redundant):
 
