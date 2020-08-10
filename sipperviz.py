@@ -1213,8 +1213,6 @@ class SipperViz(tk.Tk):
             self.makeplot_run_button.configure(state='disabled')
 
     def close_makeplot_window(self):
-        self.makeplot_window.grab_release()
-        self.grab_set()
         self.makeplot_window.withdraw()
 
     def run_makeplots(self):
@@ -1716,7 +1714,6 @@ class SipperViz(tk.Tk):
             self.content_add.configure(state='disabled')
 
     def close_content_window(self):
-        self.grab_set()
         self.contents_window.withdraw()
 
     def swapcontents(self):
