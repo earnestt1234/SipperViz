@@ -1,3 +1,4 @@
-#ignore pyinstaller build folders
+#ignore pyinstaller build folders and spec
 build/
 dist/
+sipperviz.spec
