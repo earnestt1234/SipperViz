@@ -194,3 +194,11 @@ class Sipper():
         for i in groupdict.values():
             output.update(i)
         return output
+
+    def clear_contents(self, df=pd.DataFrame()):
+        if df.empty:
+            df = self.data
+        df['LeftContents'] = np.nan
+        df['RightContents'] = np.nan
+        self.contents = []
+        self.contents_dict = {}

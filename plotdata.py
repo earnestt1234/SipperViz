@@ -4,9 +4,12 @@ Created on Wed Aug  5 13:24:18 2020
 
 @author: earne
 """
+from collections import defaultdict
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
 import seaborn as sns
 
 from sipperplots import (
@@ -290,4 +293,56 @@ def drinkcount_chronogram(sipper, circ_left=True, circ_right=True,
         temp = pd.DataFrame({label:reindexed}, index=reindexed.index)
         output = output.join(temp, how='outer')
     output.index.name = 'Hours Into Light Cycle'
+    return output
+
+def drinkcount_chronogram_grouped(sippers, groups, circ_left=True, circ_right=True,
+                                  circ_content=None, circ_var='SEM', lights_on=7,
+                                  lights_off=19, **kwargs):
+    output = pd.DataFrame(index=range(0,24))
+    output.index.name = 'Hours Into Light Cycle'
+    to_plot = defaultdict(list)
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if circ_left:
+                    key = group + ' - Left'
+                    vals = get_chronogram_vals(df['LeftCount'],
+                                               lights_on,
+                                               lights_off)
+                    vals.name = sipper.basename
+                    to_plot[key].append(vals)
+                if circ_right:
+                    key = group + ' - Right'
+                    vals = get_chronogram_vals(df['RightCount'],
+                                               lights_on,
+                                               lights_off)
+                    vals.name = sipper.basename
+                    to_plot[key].append(vals)
+                if circ_content:
+                    for c in circ_content:
+                        key = group + ' - ' + c
+                        content_vals = sipper.get_content_values(c, 'Count', df)
+                        if not content_vals.empty:
+                            vals = get_chronogram_vals(content_vals,
+                                                       lights_on,
+                                                       lights_off)
+                            vals.name = sipper.basename
+                            to_plot[key].append(vals)
+    for i, (label, data) in enumerate(to_plot.items()):
+        x = range(0,24)
+        y = np.nanmean(data, axis=0)
+        for d in data:
+            output[label + ' - ' + d.name] = d
+        output[label + ' MEAN'] = y
+        if circ_var == 'SEM':
+            sem = stats.sem(data, axis=0, nan_policy='omit')
+            output[label + ' SEM'] = sem
+        elif circ_var == 'STD':
+            std = np.nanstd(data, axis=0)
+            output[label + ' STD'] = std
     return output

@@ -10,6 +10,7 @@ import sipperplots
 
 imports = """# importing libraries (may be redundant):
 
+from collections import defaultdict
 import datetime
 import os
 import warnings
@@ -20,6 +21,7 @@ import numpy as np
 import pandas as pd
 from pandas import Timestamp
 from pandas.plotting import register_matplotlib_converters
+from scipy import stats
 import seaborn as sns
 
 register_matplotlib_converters()
@@ -32,7 +34,7 @@ plt.style.use('seaborn-whitegrid')
 func_dict = {name:func for name, func in inspect.getmembers(sipperplots)}
 
 #create a list of arguments that need to be formatted as a string
-string_args = ['binsize']
+string_args = ['binsize', 'circ_var']
 
 # create strings of the helper function code
 shade_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
@@ -109,6 +111,7 @@ def generate_code(sipper_plot):
             func_args.append(k)
 
     #loop over all arguments used by the function
+    sipper_varnames = {}
     for arg in func_args:
         #handle multiple sippers, else single sippers can
         #follow the else condition for formatting
@@ -122,6 +125,7 @@ def generate_code(sipper_plot):
             sipper_list = []
             for i, s in enumerate(used_args[arg]):
                 variable = 'sipper{}'.format(i)
+                sipper_varnames[s] = variable
                 sipper_list.append(variable)
                 output += variable + ' = ' + str(s) + '\n'
                 if sipper_plot.content_dicts[s]:
@@ -129,6 +133,14 @@ def generate_code(sipper_plot):
                     output += variable + '.assign_contents({})\n'.format(d)
             var_list = '\nsippers = ' + '[%s]' % ', '.join(map(str, sipper_list)) + '\n'
             output += var_list
+        elif arg == 'groups':
+            output += ('\ngroups = ' + str(used_args['groups']) + '\n\n')
+            for s in used_args['sippers']:
+                for group in used_args['groups']:
+                    if group in s.groups:
+                        output += (sipper_varnames[s] + '.groups.append('
+                                   + add_quotes(group) +')\n')
+            output += '\n'
         else:
             formatted = str(used_args[arg])
             if arg in string_args:

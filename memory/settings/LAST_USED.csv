@@ -1,6 +1,6 @@
 ,Value
 dfilter_val,False
-dfilter_sdate,2020-08-05
+dfilter_sdate,2020-01-01
 dfilter_edate,2020-08-05
 dfilter_shour,noon
 dfilter_ehour,noon
@@ -16,4 +16,6 @@ logx,True
 combine,True
 circ_left,True
 circ_right,True
-circ_content,True
+circ_content,False
+circ_show_indvl,False
+circ_var,SEM

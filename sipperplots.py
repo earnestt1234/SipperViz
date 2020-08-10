@@ -618,7 +618,8 @@ def drinkcount_chronogram(sipper, circ_left=True, circ_right=True,
     return fig if 'ax' not in kwargs else None
 
 def drinkcount_chronogram_grouped(sippers, groups, circ_left=True, circ_right=True,
-                                  circ_content=None, circ_var='SEM', lights_on=7,
+                                  circ_content=None, circ_var='SEM',
+                                  circ_show_indvl=False, lights_on=7,
                                   lights_off=19, shade_dark=True, **kwargs):
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
@@ -659,11 +660,13 @@ def drinkcount_chronogram_grouped(sippers, groups, circ_left=True, circ_right=Tr
         x = range(0,24)
         y = np.nanmean(data, axis=0)
         error_shade = np.nan
-        if circ_var == 'raw':
+        if circ_show_indvl:
             for d in data:
                 ax.plot(x, d, color=colors[i], alpha=.3,linewidth=.8)
         if circ_var == 'SEM':
             error_shade = stats.sem(data, axis=0, nan_policy='omit')
+        elif circ_var == 'STD':
+            error_shade = np.nanstd(data, axis=0)
         ax.plot(x, y, color=colors[i], label=label)
         ax.fill_between(x, y-error_shade, y+error_shade, color=colors[i],
                         alpha=.3)

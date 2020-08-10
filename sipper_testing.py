@@ -29,7 +29,10 @@ for i in sippers:
 
 # sipperplots.drinkcount_chronogram(s2, circ_content=['Oxy'])
 
-# sipperplots.drinkcount_chronogram_grouped(sippers, groups=['One'], circ_var='raw',
-#                                           circ_content=['Oxy'])
+sipperplots.drinkcount_chronogram_grouped(sippers, groups=['One'], circ_var='SEM',
+                                          circ_content=['Oxy'])
 
-k = plotdata.drinkcount_chronogram(s2, circ_content=['Oxy'])
+k = plotdata.drinkcount_chronogram_grouped(sippers, groups=['One'], circ_var='SEM',
+                                          circ_content=['Oxy'])
+
+# k = plotdata.drinkcount_chronogram(s2, circ_content=['Oxy'])
