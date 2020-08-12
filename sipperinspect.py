@@ -47,10 +47,12 @@ plt.style.use('seaborn-whitegrid')
 func_dict = {name:func for name, func in inspect.getmembers(sipperplots)}
 
 #create a list of arguments that need to be formatted as a string
-string_args = ['binsize', 'circ_var']
+string_args = ['binsize', 'circ_var', 'pref_bins', 'pref_side', 'pref_metric']
 
 # create strings of the helper function code
-shade_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
+shade_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative',
+               'drinkcount_binned', 'drinkduration_binned',
+               'side_preference']
 shade_help = '# shading dark periods\n\n'
 shade_help += inspect.getsource(sipperplots.convert_dt64_to_dt) + '\n'
 shade_help += inspect.getsource(sipperplots.hours_between) + '\n'
@@ -58,7 +60,9 @@ shade_help += inspect.getsource(sipperplots.is_day_or_night) + '\n'
 shade_help += inspect.getsource(sipperplots.night_intervals) + '\n'
 shade_help += inspect.getsource(sipperplots.shade_darkness) + '\n'
 
-date_format_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative']
+date_format_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative',
+                     'drinkcount_binned', 'drinkduration_binned',
+                     'side_preference']
 date_format_help = '# formatting date x-axis\n\n'
 date_format_help += inspect.getsource(sipperplots.date_format_x) + '\n'
 
@@ -70,7 +74,8 @@ idi_help += inspect.getsource(sipperplots.get_side_idi) + '\n'
 idi_help += inspect.getsource(sipperplots.get_content_idi) + '\n'
 idi_help += inspect.getsource(sipperplots.setup_idi_axes) + '\n'
 
-chrono_funcs = ['drinkcount_chronogram', 'drinkcount_chronogram_grouped']
+chrono_funcs = ['drinkcount_chronogram', 'drinkcount_chronogram_grouped',
+                'drinkduration_chronogram', 'drinkduration_chronogram_grouped']
 chrono_help = '# chronograms\n\n'
 chrono_help += inspect.getsource(sipperplots.get_chronogram_vals) + '\n'
 

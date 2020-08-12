@@ -14,13 +14,13 @@ class SipperError(Exception):
 class SipperWarning(Warning):
     """Class for sipper warnings"""
 
-def groupby_convertcontent(gr, content, out='Count'):
+def groupby_convertcontent(gr, content, out='Count', opposite=False):
     output = []
     for i, (n, d) in enumerate(gr):
         if content in d['LeftContents'].values:
-            col = 'Left' + out
+            col = 'Left' + out if not opposite else 'Right' + out
         else:
-            col = 'Right' + out
+            col = 'Right' + out if not opposite else 'Left' + out
         if output:
             start_from = np.nanmax(output[-1].values)
             to_append = d[col] + (start_from - np.nanmin(d[col].values))
@@ -164,7 +164,7 @@ class Sipper():
         all_right = pd.Series(self.data['RightContents'].unique()).dropna()
         return list(np.unique(np.concatenate([all_left,all_right])))
 
-    def get_content_values(self, content, out, df=pd.DataFrame()):
+    def get_content_values(self, content, out, df=pd.DataFrame(), opposite=False):
         if df.empty:
             df = self.data
         if out not in ['Count','Duration']:
@@ -180,7 +180,10 @@ class Sipper():
         changes = changes.astype(int).cumsum()
         gr = subset.groupby(changes)
         name = content+out
-        return groupby_convertcontent(gr, content=content, out=out).rename(name)
+        if opposite:
+            name = 'Opposite' + name
+        return groupby_convertcontent(gr, content=content, out=out,
+                                      opposite=opposite).rename(name)
 
     def get_contents_dict(self, df=pd.DataFrame()):
         if df.empty:

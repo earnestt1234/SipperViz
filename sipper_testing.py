@@ -18,7 +18,7 @@ t4 = pd.Timestamp(year=2020, month=3, day=4, hour=4)
 s = sipper.Sipper(path)
 s.assign_contents({(t1,t2):("Water","Oxy"),
                     (t2,t3):("Oxy","Water"),
-                    (t3,t4):('Water',"Oxy")})
+                    (t3,t4):('Pepsi',"Oxy")})
 d = s.data
 
 s2 = sipper.Sipper(path2)
@@ -27,12 +27,18 @@ sippers = [s, s2]
 for i in sippers:
     i.groups.append('One')
 
-# sipperplots.drinkcount_chronogram(s2, circ_content=['Oxy'])
+sipperplots.content_preference(s, pref_content=['Oxy', 'Pepsi'])
+x = plotdata.content_preference(s, pref_content=['Oxy', 'Pepsi'])
 
-sipperplots.drinkcount_chronogram_grouped(sippers, groups=['One'], circ_var='SEM',
-                                          circ_content=['Oxy'])
+#%%
+import os
 
-k = plotdata.drinkcount_chronogram_grouped(sippers, groups=['One'], circ_var='SEM',
-                                          circ_content=['Oxy'])
+direc = r"C:\Users\earne\Desktop\same_date_sippers"
+same_dates = []
+for p in os.listdir(direc):
+    sub = os.path.join(direc, p)
+    s = sipper.Sipper(sub)
+    s.groups.append('A')
+    same_dates.append(s)
 
-# k = plotdata.drinkcount_chronogram(s2, circ_content=['Oxy'])
+sipperplots.averaged_drinkcount(same_dates, groups=['A'], avg_var='indvls')

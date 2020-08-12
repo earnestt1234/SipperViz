@@ -49,18 +49,19 @@ def drinkcount_binned(sipper, binsize='1H', show_left=True, show_right=True,
         s, e = kwargs['date_filter']
         df = df[(df.index >= s) &
                 (df.index <= e)].copy()
+    base = df.index[0].hour
     if show_left:
-        binned = df['LeftCount'].diff().resample(binsize).sum()
+        binned = df['LeftCount'].diff().resample(binsize, base=base).sum()
         l = pd.DataFrame({'LeftCount' : binned}, index=binned.index)
         output = output.join(l, how='outer')
     if show_right:
-        binned = df['RightCount'].diff().resample(binsize).sum()
+        binned = df['RightCount'].diff().resample(binsize, base=base).sum()
         r = pd.DataFrame({'RightCount' : binned}, index=binned.index)
         output = output.join(r, how='outer')
     if show_content:
         for c in show_content:
             count = sipper.get_content_values(c, out='Count', df=df)
-            binned = count.diff().resample(binsize).sum()
+            binned = count.diff().resample(binsize, base=base).sum()
             if not count.empty:
                 temp = pd.DataFrame({c+'Count' : binned}, index=binned.index)
                 output = output.join(temp, how='outer')
@@ -96,18 +97,19 @@ def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
         s, e = kwargs['date_filter']
         df = df[(df.index >= s) &
                 (df.index <= e)].copy()
+    base = df.index[0].hour
     if show_left:
-        binned = df['LeftDuration'].diff().resample(binsize).sum()
+        binned = df['LeftDuration'].diff().resample(binsize, base=base).sum()
         l = pd.DataFrame({'LeftDuration' : binned}, index=binned.index)
         output = output.join(l, how='outer')
     if show_right:
-        binned = df['RightDuration'].diff().resample(binsize).sum()
+        binned = df['RightDuration'].diff().resample(binsize, base=base).sum()
         r = pd.DataFrame({'RightDuration' : binned}, index=binned.index)
         output = output.join(r, how='outer')
     if show_content:
         for c in show_content:
             count = sipper.get_content_values(c, out='Count', df=df)
-            binned = count.diff().resample(binsize).sum()
+            binned = count.diff().resample(binsize, base=base).sum()
             if not count.empty:
                 temp = pd.DataFrame({c+'Duration' : binned}, index=binned.index)
                 output = output.join(temp, how='outer')
@@ -345,4 +347,132 @@ def drinkcount_chronogram_grouped(sippers, groups, circ_left=True, circ_right=Tr
         elif circ_var == 'STD':
             std = np.nanstd(data, axis=0)
             output[label + ' STD'] = std
+    return output
+
+def drinkduration_chronogram(sipper, circ_left=True, circ_right=True,
+                             circ_content=None, lights_on=7,
+                             lights_off=19, **kwargs):
+    output = pd.DataFrame()
+    df = sipper.data
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    to_plot = []
+    labels = []
+    if circ_left:
+        to_plot.append(df['LeftDuration'])
+        labels.append('Left')
+    if circ_right:
+        to_plot.append(df['RightDuration'])
+        labels.append('Right')
+    if circ_content:
+        for c in circ_content:
+            vals = sipper.get_content_values(c, 'Duration', df=df)
+            if not vals.empty:
+                to_plot.append()
+                labels.append(c)
+    for i, series in enumerate(to_plot):
+        reindexed = get_chronogram_vals(series, lights_on, lights_off)
+        if reindexed.empty:
+            continue
+        label = labels[i]
+        temp = pd.DataFrame({label:reindexed}, index=reindexed.index)
+        output = output.join(temp, how='outer')
+    output.index.name = 'Hours Into Light Cycle'
+    return output
+
+def drinkduration_chronogram_grouped(sippers, groups, circ_left=True, circ_right=True,
+                                     circ_content=None, circ_var='SEM', lights_on=7,
+                                     lights_off=19, **kwargs):
+    output = pd.DataFrame(index=range(0,24))
+    output.index.name = 'Hours Into Light Cycle'
+    to_plot = defaultdict(list)
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if circ_left:
+                    key = group + ' - Left'
+                    vals = get_chronogram_vals(df['LeftDuration'],
+                                               lights_on,
+                                               lights_off)
+                    vals.name = sipper.basename
+                    to_plot[key].append(vals)
+                if circ_right:
+                    key = group + ' - Right'
+                    vals = get_chronogram_vals(df['RightDuration'],
+                                               lights_on,
+                                               lights_off)
+                    vals.name = sipper.basename
+                    to_plot[key].append(vals)
+                if circ_content:
+                    for c in circ_content:
+                        key = group + ' - ' + c
+                        content_vals = sipper.get_content_values(c, 'Duration', df)
+                        if not content_vals.empty:
+                            vals = get_chronogram_vals(content_vals,
+                                                       lights_on,
+                                                       lights_off)
+                            vals.name = sipper.basename
+                            to_plot[key].append(vals)
+    for i, (label, data) in enumerate(to_plot.items()):
+        x = range(0,24)
+        y = np.nanmean(data, axis=0)
+        for d in data:
+            output[label + ' - ' + d.name] = d
+        output[label + ' MEAN'] = y
+        if circ_var == 'SEM':
+            sem = stats.sem(data, axis=0, nan_policy='omit')
+            output[label + ' SEM'] = sem
+        elif circ_var == 'STD':
+            std = np.nanstd(data, axis=0)
+            output[label + ' STD'] = std
+    return output
+
+def side_preference(sipper, pref_side='Left', pref_metric='Count', pref_bins='1H',
+                    **kwargs):
+    df = sipper.data
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    base = df.index[0].hour
+    lcol = 'Left' + pref_metric
+    rcol = 'Right' + pref_metric
+    l_data = df[lcol].diff().resample(pref_bins, base=base).sum()
+    r_data = df[rcol].diff().resample(pref_bins, base=base).sum()
+    total = l_data + r_data
+    if pref_side == 'Left':
+        preference = l_data/total
+    else:
+        preference = r_data/total
+    preference *= 100
+    output = pd.DataFrame(preference)
+    output.columns = ['{} Preference (% Drink {})'.format(pref_side, pref_metric)]
+    return output
+
+def content_preference(sipper, pref_content=[], pref_metric='Count', pref_bins='1H',
+                       lights_on=7, lights_off=19, shade_dark=True, **kwargs):
+    output = pd.DataFrame()
+    df = sipper.data
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    base = df.index[0].hour
+    for i, c in enumerate(pref_content):
+        target = sipper.get_content_values(c, out=pref_metric, df=df)
+        target = target.diff().resample(pref_bins, base=base).sum()
+        other  = sipper.get_content_values(c, out=pref_metric, df=df,
+                                           opposite=True)
+        other = other.diff().resample(pref_bins, base=base).sum()
+        if not target.empty and not other.empty:
+            preference = target / (target + other) * 100
+            temp = pd.DataFrame({c : preference}, index=preference.index)
+            output = output.join(temp, how='outer')
     return output
