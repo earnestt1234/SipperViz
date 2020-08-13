@@ -87,6 +87,7 @@ class SipperViz(tk.Tk):
             elif 'hour' in val:
                 out += 'H'
             self.bin_convert[val] = out
+        self.hour_binsizes = [b for b in self.binsizes if 'hour' in b]
 
         #link each plot function to a pretty name
         #also reverse the dictionary when needing to access the plot from the name
@@ -116,7 +117,11 @@ class SipperViz(tk.Tk):
             sipperplots.side_preference:
                 'Side Preference',
             sipperplots.content_preference:
-                'Content Preference'}
+                'Content Preference',
+            sipperplots.averaged_drinkcount:
+                'Average Drink Count',
+            sipperplots.averaged_drinkduration:
+                'Average Drink Duration'}
         self.plot_names_to_funcs = {v:k for k,v in self.plot_default_names.items()}
 
         #link each plot to its function for retrieving data
@@ -148,7 +153,9 @@ class SipperViz(tk.Tk):
         #  for plots using groups
         for func in [
                 sipperplots.drinkcount_chronogram_grouped,
-                sipperplots.drinkduration_chronogram_grouped
+                sipperplots.drinkduration_chronogram_grouped,
+                sipperplots.averaged_drinkcount,
+                sipperplots.averaged_drinkduration
                 ]:
             self.plot_routes[func] = self.group_plot
 
@@ -171,7 +178,10 @@ class SipperViz(tk.Tk):
                               'pref_side': 'preference side',
                               'pref_metric': 'metric',
                               'pref_bins': 'bin size',
-                              'pref_content': 'content'}
+                              'pref_content': 'content',
+                              'averaging': 'averaging method',
+                              'avg_bins': 'binning size',
+                              'avg_var': 'error value'}
 
         #flag to prevent repetitive drawing of plots
         self.suspend_plot_raising = False
@@ -312,6 +322,37 @@ class SipperViz(tk.Tk):
         self.groupselect.grid(row=0, column=0, sticky='nsw', padx=(20,0))
         self.groupselect_scroll.grid(row=0, column=1, sticky='nsw')
         self.groupselect_text.grid(row=0, column=2, sticky='new', padx=20)
+
+        # averaging
+        self.avg_settings = tk.Frame(self.plot_settings_window)
+        self.plot_settings_tabs.add(self.avg_settings,
+                                    text='Averaging')
+        s1 = 'The following settings affect Average Drink Count, and '
+        s2 = 'Average Drink Duration plots'
+        text = s1 + s2
+        self.avg_settings_label = tk.Label(self.avg_settings, text=text,
+                                           wraplength=600, justify='left')
+        self.avg_method_label = tk.Label(self.avg_settings, text='Averaging method')
+        self.avg_method_menu = ttk.Combobox(self.avg_settings,
+                                            values=['Absolute Time', 'Relative Time', 'Elapsed Time'])
+        self.avg_method_menu.set('Absolute Time')
+        self.avg_bins_label = tk.Label(self.avg_settings, text='Bin size for averaging')
+        self.avg_bins_menu = ttk.Combobox(self.avg_settings,
+                                          values=self.hour_binsizes)
+        self.avg_bins_menu.set('1 hour')
+        self.avg_var_label = tk.Label(self.avg_settings, text='Error metric for averaging')
+        self.avg_var_menu = ttk.Combobox(self.avg_settings,
+                                         values=['SEM', 'STD', 'Individual Data', 'None'])
+        self.avg_var_menu.set('SEM')
+
+        self.avg_settings_label.grid(row=0, column=0, columnspan=2, sticky='w',
+                                     padx=20, pady=5)
+        self.avg_method_label.grid(row=1, column=0, sticky='w', padx=20, pady=5)
+        self.avg_method_menu.grid(row=1, column=1, sticky='nsew', padx=20, pady=5)
+        self.avg_bins_label.grid(row=2, column=0, sticky='w', padx=20, pady=5)
+        self.avg_bins_menu.grid(row=2, column=1, sticky='nsew', padx=20, pady=5)
+        self.avg_var_label.grid(row=3, column=0, sticky='w', padx=20, pady=5)
+        self.avg_var_menu.grid(row=3, column=1, sticky='nsew', padx=20, pady=5)
 
         # drinks
         self.drink_settings = tk.Frame(self.plot_settings_window)
@@ -605,8 +646,10 @@ class SipperViz(tk.Tk):
                                                               open=True)
         self.makeplot_selection.insert(self.makeplot_drinks, 1, text='Drink Count (Cumulative)')
         self.makeplot_selection.insert(self.makeplot_drinks, 2, text='Drink Count (Binned)')
-        self.makeplot_selection.insert(self.makeplot_drinks, 3, text='Drink Duration (Cumulative)')
-        self.makeplot_selection.insert(self.makeplot_drinks, 4, text='Drink Duration (Binned)')
+        self.makeplot_selection.insert(self.makeplot_drinks, 3, text='Average Drink Count')
+        self.makeplot_selection.insert(self.makeplot_drinks, 4, text='Drink Duration (Cumulative)')
+        self.makeplot_selection.insert(self.makeplot_drinks, 5, text='Drink Duration (Binned)')
+        self.makeplot_selection.insert(self.makeplot_drinks, 6, text='Average Drink Duration')
         self.makeplot_pref = self.makeplot_selection.insert('', 2, text='Preference',
                                                             open=True)
         self.makeplot_selection.insert(self.makeplot_pref, 1, text='Side Preference')
@@ -731,10 +774,14 @@ class SipperViz(tk.Tk):
                                   self.iter_plot(sipperplots.drinkcount_cumulative))
         self.plotmenu.add_command(label='Drink Count (Binned)', command=lambda:
                                   self.iter_plot(sipperplots.drinkcount_binned))
+        self.plotmenu.add_command(label='Average Drink Count', command=lambda:
+                                  self.group_plot(sipperplots.averaged_drinkcount))
         self.plotmenu.add_command(label='Drink Duration (Cumulative)', command=lambda:
                                   self.iter_plot(sipperplots.drinkduration_cumulative))
         self.plotmenu.add_command(label='Drink Duration (Binned)', command=lambda:
                                   self.iter_plot(sipperplots.drinkduration_binned))
+        self.plotmenu.add_command(label='Average Drink Duration', command=lambda:
+                                  self.group_plot(sipperplots.averaged_drinkduration))
         self.plotmenu.add_separator()
         self.plotmenu.add_command(label='Side Preference', command=lambda:
                                   self.iter_plot(sipperplots.side_preference))
@@ -967,7 +1014,7 @@ class SipperViz(tk.Tk):
     #---operations pre opening
         last_settings = 'memory/settings/LAST_USED.CSV'
         if os.path.isfile(last_settings):
-            # self.load_settings_df(last_settings) #for testing
+            self.load_settings_df(last_settings) #for testing
             try:
                 self.load_settings_df(last_settings)
             except:
@@ -986,15 +1033,15 @@ class SipperViz(tk.Tk):
             self.loading = True
             self.loading_window.deiconify()
             for file in files:
+                self.loading_str.set(file)
+                self.update()
                 if self.loading:
                     try:
                         self.loaded_sippers.append(sipper.Sipper(file))
                     except:
                         tb = traceback.format_exc()
                         print(tb)
-                self.loading_str.set(file)
                 self.loading_bar.step(1/len(files)*100)
-                self.update()
             self.update_file_view()
             self.update_avail_contents()
             self.update_all_buttons()
@@ -1269,7 +1316,9 @@ class SipperViz(tk.Tk):
                 plottable = True
         if graphname in [
                 'Grouped Chronogram (Drink Count)',
-                'Grouped Chronogram (Drink Duration)'
+                'Grouped Chronogram (Drink Duration)',
+                'Average Drink Count',
+                'Average Drink Duration'
                 ]:
             if self.groupselect.selection():
                 plottable = True
@@ -1464,7 +1513,7 @@ class SipperViz(tk.Tk):
         group_name = self.create_name.get()
         self.loaded_groups.append(group_name)
         self.groupview.insert('', 'end', iid=group_name, text=group_name)
-        self.groupview.selection_add(group_name)
+        self.groupview.selection_set(group_name)
         self.create_window.destroy()
 
     def create_group_check(self, *args):
@@ -1591,7 +1640,10 @@ class SipperViz(tk.Tk):
                              circ_var        =self.circ_var_menu.get(),
                              pref_side       =self.side_pref_var.get(),
                              pref_metric     =self.pref_metric_var.get(),
-                             pref_bins       =self.pref_binsize_menu.get())
+                             pref_bins       =self.pref_binsize_menu.get(),
+                             averaging       =self.avg_method_menu.get(),
+                             avg_bins        =self.avg_bins_menu.get(),
+                             avg_var         =self.avg_var_menu.get())
         return settings_dict
 
     def get_settings_dict_as_args(self):
@@ -1605,8 +1657,12 @@ class SipperViz(tk.Tk):
         settings_dict['pref_content'] = pref_content
         for time_setting in ['lights_on','lights_off']:
             settings_dict[time_setting] = self.times_to_int[settings_dict[time_setting]]
-        for bin_setting in ['binsize', 'pref_bins']:
+        for bin_setting in ['binsize', 'pref_bins', 'avg_bins']:
             settings_dict[bin_setting] = self.bin_convert[settings_dict[bin_setting]]
+        method_d = {'Absolute Time' : 'datetime',
+                    'Relative Time': 'time',
+                    'Elapsed Time': 'elpased'}
+        settings_dict['averaging'] = method_d[settings_dict['averaging']]
         return settings_dict
 
     def get_settings_df(self):
@@ -1661,6 +1717,9 @@ class SipperViz(tk.Tk):
             self.side_pref_var.set(df.loc['pref_side', v])
             self.pref_metric_var.set(df.loc['pref_metric', v])
             self.pref_binsize_menu.set(df.loc['pref_bins', v])
+            self.avg_method_menu.set(df.loc['averaging', v])
+            self.avg_bins_menu.set(df.loc['avg_bins', v])
+            self.avg_var_menu.set(df.loc['avg_var', v])
 
     def set_date_filter_state(self):
         if self.date_filter_val.get():

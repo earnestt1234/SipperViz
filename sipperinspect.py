@@ -47,12 +47,14 @@ plt.style.use('seaborn-whitegrid')
 func_dict = {name:func for name, func in inspect.getmembers(sipperplots)}
 
 #create a list of arguments that need to be formatted as a string
-string_args = ['binsize', 'circ_var', 'pref_bins', 'pref_side', 'pref_metric']
+string_args = ['binsize', 'circ_var', 'pref_bins', 'pref_side', 'pref_metric',
+               'averaging', 'avg_bins', 'avg_var']
 
 # create strings of the helper function code
 shade_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative',
                'drinkcount_binned', 'drinkduration_binned',
-               'side_preference']
+               'side_preference', 'averaged_drinkcount',
+               'averaged_drinkdruation']
 shade_help = '# shading dark periods\n\n'
 shade_help += inspect.getsource(sipperplots.convert_dt64_to_dt) + '\n'
 shade_help += inspect.getsource(sipperplots.hours_between) + '\n'
@@ -62,7 +64,8 @@ shade_help += inspect.getsource(sipperplots.shade_darkness) + '\n'
 
 date_format_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative',
                      'drinkcount_binned', 'drinkduration_binned',
-                     'side_preference']
+                     'side_preference', 'averaged_drinkcount',
+                     'averaged_drinkdruation']
 date_format_help = '# formatting date x-axis\n\n'
 date_format_help += inspect.getsource(sipperplots.date_format_x) + '\n'
 
@@ -79,6 +82,11 @@ chrono_funcs = ['drinkcount_chronogram', 'drinkcount_chronogram_grouped',
 chrono_help = '# chronograms\n\n'
 chrono_help += inspect.getsource(sipperplots.get_chronogram_vals) + '\n'
 
+avg_funcs = ['averaged_drinkcount', 'averaged_drinkdruation']
+avg_help = '# averaging\n\n'
+avg_help += inspect.getsource(sipperplots.preproc_averaging) + '\n'
+avg_help += inspect.getsource(sipperplots.format_averaging_axes) + '\n'
+
 def add_quotes(string):
     output = '"' + string + '"'
     return output
@@ -93,7 +101,7 @@ def generate_code(sipper_plot):
 
     # helper functions for loading sippers
     output += '# sipper loading helper functions\n'
-    output += inspect.getsource(sipperplots.date_filter_okay) + '\n'
+    output += inspect.getsource(sipper.date_filter_okay) + '\n'
     output += inspect.getsource(sipper.SipperError) + '\n'
     output += inspect.getsource(sipper.SipperWarning) + '\n'
     output += inspect.getsource(sipper.is_concatable) + '\n'
@@ -113,6 +121,8 @@ def generate_code(sipper_plot):
         output += idi_help
     if funcname in chrono_funcs:
         output += chrono_help
+    if funcname in avg_funcs:
+        output += avg_help
 
     # plotting function
     output += '# plotting function\n'

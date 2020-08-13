@@ -6,13 +6,16 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from sipperplots import date_filter_okay
-
 class SipperError(Exception):
     """Class for sipper errors"""
 
 class SipperWarning(Warning):
     """Class for sipper warnings"""
+
+def date_filter_okay(df, start, end):
+    check = df[(df.index >= start) &
+            (df.index <= end)].copy()
+    return not check.empty
 
 def groupby_convertcontent(gr, content, out='Count', opposite=False):
     output = []
@@ -86,8 +89,16 @@ def sipper_concat(sippers):
 class Sipper():
     def __init__(self, path):
         self.path = path
+        print('Loading {}...'.format(path))
         try:
-            self.data = pd.read_csv(path)
+            self.basename = os.path.basename(path)
+            self.filename, self.extension = os.path.splitext(self.basename)
+            if self.extension == '.xlsx':
+                warnings.warn('Excel files can take siginficantly longer to load than .csv')
+            self.extension = self.extension.lower()
+            read_opts = {'.csv':pd.read_csv, '.xlsx':pd.read_excel}
+            func = read_opts[self.extension]
+            self.data = func(path)
             self.data.columns = self.data.columns.str.strip()
             og_columns = ['MM:DD:YYYY hh:mm:ss', 'Elapsed Time', 'Device',
                           'LeftCount', 'LeftDuration', 'RightCount',
@@ -111,7 +122,10 @@ class Sipper():
                                           'RightCount','RightDuration'],
                                   inplace=True)
         self.data['MM:DD:YYYY hh:mm:ss'] = pd.to_datetime(self.data['MM:DD:YYYY hh:mm:ss'])
-        self.data['Elapsed Time'] = pd.to_timedelta(self.data['Elapsed Time'])
+        try:
+            self.data['Elapsed Time'] = pd.to_timedelta(self.data['Elapsed Time'])
+        except:
+            pass
         self.data = self.data.set_index('MM:DD:YYYY hh:mm:ss')
         if 'LeftContents' not in self.data.columns:
             self.data['LeftContents'] = np.nan
@@ -121,7 +135,6 @@ class Sipper():
 
         #informational attributes
         self.basename = os.path.basename(path)
-        self.filename, self.extension = os.path.splitext(self.basename)
         if len(set(self.data['Device'])) == 1:
             self.device_no = self.data['Device'][0]
         else:

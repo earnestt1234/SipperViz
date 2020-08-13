@@ -7,8 +7,8 @@ dfilter_ehour,noon
 shade_dark,True
 lights_on,7 am
 lights_off,7 pm
-show_left,True
-show_right,True
+show_left,False
+show_right,False
 show_content_val,True
 binsize,1 hour
 kde,True
@@ -22,3 +22,6 @@ circ_var,SEM
 pref_side,Right
 pref_metric,Duration
 pref_bins,1 hour
+averaging,Absolute Time
+avg_bins,1 hour
+avg_var,Individual Data

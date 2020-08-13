@@ -16,7 +16,8 @@ from sipperplots import (
     get_any_idi,
     get_side_idi,
     get_content_idi,
-    get_chronogram_vals
+    get_chronogram_vals,
+    preproc_averaging
         )
 
 def drinkcount_cumulative(sipper, show_left=True, show_right=True,
@@ -475,4 +476,116 @@ def content_preference(sipper, pref_content=[], pref_metric='Count', pref_bins='
             preference = target / (target + other) * 100
             temp = pd.DataFrame({c : preference}, index=preference.index)
             output = output.join(temp, how='outer')
+    return output
+
+def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
+                        avg_var='SEM', show_left=True, show_right=True,
+                        show_content=[], **kwargs):
+    output = pd.DataFrame()
+    to_plot = defaultdict(list)
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if show_left:
+                    key = '{} - Left'.format(group)
+                    vals = df['LeftCount'].diff().rename(sipper.basename)
+                    to_plot[key].append(vals)
+                if show_right:
+                    key = '{} - Right'.format(group)
+                    vals = df['RightCount'].diff().rename(sipper.basename)
+                    to_plot[key].append(vals)
+                if show_content:
+                    for c in show_content:
+                        key = '{} - {}'.format(group, c)
+                        vals = sipper.get_content_values(c, out='Count',
+                                                         df=df).diff()
+                        to_plot[key].append(vals.rename(sipper.basename))
+    for i, (label, data) in enumerate(to_plot.items()):
+        temp = pd.DataFrame()
+        error_shade = np.nan
+        processed = preproc_averaging(data, averaging=averaging,
+                                      avg_bins=avg_bins, agg='sum')
+        x = processed['x']
+        ys = processed['ys']
+        mean = np.nanmean(ys, axis=0)
+        temp = temp.reindex(x)
+        for y in ys:
+            temp['{} ({})'.format(y.name, label)] = y
+        temp['{} MEAN'.format(label)] = mean
+        if avg_var == 'SEM':
+            temp['{} SEM'.format(label)] = stats.sem(ys, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            temp['{} STD'.format(label)] = np.nanstd(ys, axis=0)
+        output = output.join(temp, how='outer')
+    if averaging == 'datetime':
+        output.index.name = 'Date'
+    elif averaging == 'time':
+        first = output.index[0]
+        output.index = [i - first for i in output.index]
+        output.index = (output.index.total_seconds()/3600).astype(int)
+        output.index.name = 'Hours Since {}:00'.format(str(first.hour))
+    elif averaging == 'elapsed':
+        output.index = output.index.astype(int)
+        output.index.name = 'Elapsed Hours'
+    return output
+
+def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
+                           avg_var='SEM', show_left=True, show_right=True,
+                           show_content=[], **kwargs):
+    output = pd.DataFrame()
+    to_plot = defaultdict(list)
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if show_left:
+                    key = '{} - Left'.format(group)
+                    vals = df['LeftDuration'].diff().rename(sipper.basename)
+                    to_plot[key].append(vals)
+                if show_right:
+                    key = '{} - Right'.format(group)
+                    vals = df['RightDuration'].diff().rename(sipper.basename)
+                    to_plot[key].append(vals)
+                if show_content:
+                    for c in show_content:
+                        key = '{} - {}'.format(group, c)
+                        vals = sipper.get_content_values(c, out='Duration',
+                                                         df=df).diff()
+                        to_plot[key].append(vals.rename(sipper.basename))
+    for i, (label, data) in enumerate(to_plot.items()):
+        temp = pd.DataFrame()
+        error_shade = np.nan
+        processed = preproc_averaging(data, averaging=averaging,
+                                      avg_bins=avg_bins, agg='sum')
+        x = processed['x']
+        ys = processed['ys']
+        mean = np.nanmean(ys, axis=0)
+        temp = temp.reindex(x)
+        for y in ys:
+            temp['{} ({})'.format(y.name, label)] = y
+        temp['{} MEAN'.format(label)] = mean
+        if avg_var == 'SEM':
+            temp['{} SEM'.format(label)] = stats.sem(ys, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            temp['{} STD'.format(label)] = np.nanstd(ys, axis=0)
+        output = output.join(temp, how='outer')
+    if averaging == 'datetime':
+        output.index.name = 'Date'
+    elif averaging == 'time':
+        first = output.index[0]
+        output.index = [i - first for i in output.index]
+        output.index = (output.index.total_seconds()/3600).astype(int)
+        output.index.name = 'Hours Since {}:00'.format(str(first.hour))
+    elif averaging == 'elapsed':
+        output.index = output.index.astype(int)
+        output.index.name = 'Elapsed Hours'
     return output

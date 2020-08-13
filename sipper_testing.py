@@ -27,8 +27,14 @@ sippers = [s, s2]
 for i in sippers:
     i.groups.append('One')
 
-sipperplots.content_preference(s, pref_content=['Oxy', 'Pepsi'])
-x = plotdata.content_preference(s, pref_content=['Oxy', 'Pepsi'])
+sipperplots.drinkcount_chronogram_grouped(sippers, groups=['One'])
+x = plotdata.drinkcount_chronogram_grouped(sippers, groups=['One'])
+
+#%%
+l = d['LeftCount']
+origin = l.index[0]
+elapsed = [i - origin for i in l.index]
+l.index = elapsed
 
 #%%
 import os
@@ -38,7 +44,16 @@ same_dates = []
 for p in os.listdir(direc):
     sub = os.path.join(direc, p)
     s = sipper.Sipper(sub)
-    s.groups.append('A')
+    if 'Copy' in p:
+        s.groups.append('B')
+    else:
+        s.groups.append('A')
     same_dates.append(s)
 
-sipperplots.averaged_drinkcount(same_dates, groups=['A'], avg_var='indvls')
+    #%%
+
+sipperplots.averaged_drinkcount(same_dates, groups=['A', 'B'], avg_var='indvls',
+                                averaging='elapsed', avg_bins='7H')
+
+data = plotdata.averaged_drinkcount(same_dates, groups=['A', 'B'], avg_var='indvls',
+                                    averaging='elapsed', avg_bins='7H')

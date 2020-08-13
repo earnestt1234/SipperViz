@@ -11,12 +11,9 @@ import pandas as pd
 from scipy import stats
 import seaborn as sns
 
-#---dates and shading
+from sipper import SipperError
 
-def date_filter_okay(df, start, end):
-    check = df[(df.index >= start) &
-            (df.index <= end)].copy()
-    return not check.empty
+#---dates and shading
 
 def convert_dt64_to_dt(dt64):
     """Converts numpy datetime to standard datetime (needed for shade_darkness
@@ -339,11 +336,13 @@ def get_chronogram_vals(series, lights_on, lights_off):
 #---averageing helpers
 def preproc_averaging(data, averaging='datetime', avg_bins='1H',
                       agg='sum'):
+    if averaging not in ['datetime','time','elapsed']:
+        raise SipperError('averaging must be "datetime", "time", or "elapsed"')
     output = {}
     output['ys'] = []
     if averaging == 'datetime':
         earliest_end = pd.Timestamp(2200,1,1,0,0,0)
-        latest_start = datetime.datetime(1970,1,1,0,0,0)
+        latest_start = pd.Timestamp(1970,1,1,0,0,0)
         for d in data:
             if min(d.index) > latest_start:
                 latest_start = min(d.index)
@@ -352,21 +351,102 @@ def preproc_averaging(data, averaging='datetime', avg_bins='1H',
         for d in data:
             if latest_start not in d.index:
                 d.loc[latest_start] = np.nan
-            resampled = d.resample(avg_bins).apply(method)
+            r = d.resample(avg_bins).apply(agg)
             r = r[(r.index >= latest_start) &
                   (r.index <= earliest_end)].copy()
             output['ys'].append(r)
         output['x'] = r.index
-    if averaging == 'time':
-
+    elif averaging == 'time':
+        earliest_start = pd.Timestamp(2200,1,1,0,0,0)
+        latest_end = pd.Timestamp(1970,1,1,0,0,0)
+        shifted = []
+        for d in data:
+            r = d.resample(avg_bins).apply(agg)
+            first = r.index[0]
+            aligned = pd.Timestamp(year=1970, month=1, day=1, hour=first.hour)
+            shift = first - aligned
+            r.index = [i-shift for i in r.index]
+            if r.index.min() < earliest_start:
+                earliest_start = r.index.min()
+            if r.index.max() > latest_end:
+                latest_end = r.index.max()
+            shifted.append(r)
+        full_dr = pd.date_range(earliest_start, latest_end, freq=avg_bins)
+        output['x'] = full_dr
+        for s in shifted:
+            reindexed = s.reindex(full_dr)
+            output['ys'].append(reindexed)
+    elif averaging == 'elapsed':
+        maxx = pd.Timedelta(0)
+        elapsed_data = []
+        for d in data:
+            origin = d.index[0]
+            elapsed = [i - origin for i in d.index]
+            d.index = elapsed
+            r = d.resample(avg_bins).apply(agg)
+            if r.index.max() > maxx:
+                longest_index = r.index
+            elapsed_data.append(r)
+        output['x'] = longest_index.total_seconds()/3600
+        for s in elapsed_data:
+            reindexed = s.reindex(longest_index)
+            reindexed.index = reindexed.index.total_seconds()/3600
+            output['ys'].append(reindexed)
     return output
 
 def format_averaging_axes(ax, averaging, xdata, shade_dark=True,
                           lights_on=7, lights_off=19):
     if averaging  == 'datetime':
-        date_format_x(ax, xdata[0], xdata[-1])
+        mindate = pd.Timestamp(2200,1,1,0,0,0)
+        maxdate = pd.Timestamp(1970,1,1,0,0,0)
+        for x in xdata:
+            if x.min() < mindate:
+                mindate = x.min()
+            if x.max() > maxdate:
+                maxdate = x.max()
+        ax.set_xlabel('Date')
+        date_format_x(ax, mindate, maxdate)
         if shade_dark:
-            shade_darkness(ax, xdata[0], xdata[-1], lights_on, lights_off)
+            shade_darkness(ax, mindate, maxdate, lights_on, lights_off)
+    elif averaging == 'time':
+        mindate = pd.Timestamp(2200,1,1,0,0,0)
+        maxdate = pd.Timestamp(1970,1,1,0,0,0)
+        for x in xdata:
+            if x.min() < mindate:
+                mindate = x.min()
+            if x.max() > maxdate:
+                maxdate = x.max()
+        start_hour = mindate.strftime('%I%p')
+        if start_hour[0] == '0':
+            start_hour = start_hour[1:]
+        ax.set_xlabel('Hours Since {} on First Day'.format(start_hour))
+        if shade_dark:
+            shade_darkness(ax, mindate, maxdate,
+                           lights_on=lights_on,
+                           lights_off=lights_off,
+                           convert=False)
+        c = 12
+        ticks = pd.date_range(mindate, maxdate, freq='{}H'.format(str(c)))
+        tick_labels = [i*c for i in range(len(ticks))]
+        while len(ticks) > 10:
+            c += 12
+            ticks = pd.date_range(mindate, maxdate, freq='{}H'.format(str(c)))
+            tick_labels = [i*c for i in range(len(ticks))]
+        ax.set_xticks(ticks)
+        ax.set_xticklabels(tick_labels)
+        ax.set_xlim(mindate, maxdate + datetime.timedelta(hours=5))
+    elif averaging == 'elapsed':
+        maxx = 0
+        for x in xdata:
+            if x.max() > maxx:
+                maxx = x.max()
+        ax.set_xlabel('Elapsed Hours')
+        c = 12
+        ticks = range(0, int(maxx + 1), c)
+        while len(ticks) > 10:
+            c += 12
+            ticks = range(0, len(maxx) + 1, c)
+        ax.set_xticks(ticks)
 
 #---drink plots
 
@@ -937,14 +1017,16 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
                         vals = sipper.get_content_values(c, out='Count',
                                                          df=df).diff()
                         to_plot[key].append(vals)
+    xdata = []
     for i, (label, data) in enumerate(to_plot.items()):
         error_shade = np.nan
         processed = preproc_averaging(data, averaging=averaging,
                                       avg_bins=avg_bins, agg='sum')
         x = processed['x']
+        xdata.append(x)
         ys = processed['ys']
         mean = np.nanmean(ys, axis=0)
-        if avg_var == 'indvls':
+        if avg_var == 'Individual Data':
             for y in ys:
                 ax.plot(x, y, color=colors[i], alpha=.5, linewidth=.8)
         if avg_var == 'SEM':
@@ -954,13 +1036,66 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
         ax.plot(x, mean, label=label, color=colors[i])
         ax.fill_between(x, mean-error_shade, mean+error_shade, color=colors[i],
                         alpha=.3)
-    format_averaging_axes(ax, averaging, x)
+    format_averaging_axes(ax, averaging, xdata)
     ax.set_title('Average Drink Count')
     ax.set_ylabel('Drinks')
-    ax.set_xlabel('Date')
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
-
+def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
+                           avg_var='SEM', show_left=True, show_right=True,
+                           show_content=[], shade_dark=True, lights_on=7,
+                           lights_off=19, **kwargs):
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    to_plot = defaultdict(list)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if show_left:
+                    key = '{} - Left'.format(group)
+                    to_plot[key].append(df['LeftDuration'].diff())
+                if show_right:
+                    key = '{} - Right'.format(group)
+                    to_plot[key].append(df['RightDuration'].diff())
+                if show_content:
+                    for c in show_content:
+                        key = '{} - {}'.format(group, c)
+                        vals = sipper.get_content_values(c, out='Duration',
+                                                         df=df).diff()
+                        to_plot[key].append(vals)
+    xdata = []
+    for i, (label, data) in enumerate(to_plot.items()):
+        error_shade = np.nan
+        processed = preproc_averaging(data, averaging=averaging,
+                                      avg_bins=avg_bins, agg='sum')
+        x = processed['x']
+        xdata.append(x)
+        ys = processed['ys']
+        mean = np.nanmean(ys, axis=0)
+        if avg_var == 'Individual Data':
+            for y in ys:
+                ax.plot(x, y, color=colors[i], alpha=.5, linewidth=.8)
+        if avg_var == 'SEM':
+            error_shade = stats.sem(ys, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            error_shade = np.nanstd(ys, axis=0)
+        ax.plot(x, mean, label=label, color=colors[i])
+        ax.fill_between(x, mean-error_shade, mean+error_shade, color=colors[i],
+                        alpha=.3)
+    format_averaging_axes(ax, averaging, xdata)
+    ax.set_title('Average Drink Duration')
+    ax.set_ylabel('Drink Duration (s)')
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
 
