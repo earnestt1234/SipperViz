@@ -121,7 +121,11 @@ class SipperViz(tk.Tk):
             sipperplots.averaged_drinkcount:
                 'Average Drink Count',
             sipperplots.averaged_drinkduration:
-                'Average Drink Duration'}
+                'Average Drink Duration',
+            sipperplots.averaged_side_preference:
+                'Average Side Preference',
+            sipperplots.averaged_content_preference:
+                'Average Content Preference'}
         self.plot_names_to_funcs = {v:k for k,v in self.plot_default_names.items()}
 
         #link each plot to its function for retrieving data
@@ -155,7 +159,9 @@ class SipperViz(tk.Tk):
                 sipperplots.drinkcount_chronogram_grouped,
                 sipperplots.drinkduration_chronogram_grouped,
                 sipperplots.averaged_drinkcount,
-                sipperplots.averaged_drinkduration
+                sipperplots.averaged_drinkduration,
+                sipperplots.averaged_side_preference,
+                sipperplots.averaged_content_preference,
                 ]:
             self.plot_routes[func] = self.group_plot
 
@@ -653,7 +659,9 @@ class SipperViz(tk.Tk):
         self.makeplot_pref = self.makeplot_selection.insert('', 2, text='Preference',
                                                             open=True)
         self.makeplot_selection.insert(self.makeplot_pref, 1, text='Side Preference')
-        self.makeplot_selection.insert(self.makeplot_pref, 2, text='Content Preference')
+        self.makeplot_selection.insert(self.makeplot_pref, 2, text='Average Side Preference')
+        self.makeplot_selection.insert(self.makeplot_pref, 3, text='Content Preference')
+        self.makeplot_selection.insert(self.makeplot_pref, 4, text='Average Content Preference')
         self.makeplot_idi = self.makeplot_selection.insert('', 3, text='IDI',
                                                            open=True)
         self.makeplot_selection.insert(self.makeplot_idi, 1, text='Interdrink Intervals')
@@ -785,8 +793,12 @@ class SipperViz(tk.Tk):
         self.plotmenu.add_separator()
         self.plotmenu.add_command(label='Side Preference', command=lambda:
                                   self.iter_plot(sipperplots.side_preference))
+        self.plotmenu.add_command(label='Average Side Preference', command=lambda:
+                                  self.group_plot(sipperplots.averaged_side_preference))
         self.plotmenu.add_command(label='Content Preference', command=lambda:
                                   self.iter_plot(sipperplots.content_preference))
+        self.plotmenu.add_command(label='Average Content Preference', command=lambda:
+                                  self.group_plot(sipperplots.averaged_content_preference))
         self.plotmenu.add_separator()
         self.plotmenu.add_command(label='Interdrink Intervals', command=lambda:
                                   self.combo_plot(sipperplots.interdrink_intervals))
@@ -1318,7 +1330,9 @@ class SipperViz(tk.Tk):
                 'Grouped Chronogram (Drink Count)',
                 'Grouped Chronogram (Drink Duration)',
                 'Average Drink Count',
-                'Average Drink Duration'
+                'Average Drink Duration',
+                'Average Side Preference',
+                'Average Content Preference'
                 ]:
             if self.groupselect.selection():
                 plottable = True

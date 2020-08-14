@@ -1099,3 +1099,122 @@ def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
+def averaged_side_preference(sippers, groups, averaging='datetime', avg_bins='1H',
+                             avg_var='SEM', pref_side='Left', pref_metric='Count',
+                             shade_dark=True, lights_on=7, lights_off=19, **kwargs):
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    to_plot = defaultdict(lambda: defaultdict((list)))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                to_plot[group]['Left'].append(df['Left' + pref_metric].diff())
+                to_plot[group]['Right'].append(df['Right' + pref_metric].diff())
+    xdata = []
+    for i, (label, dic) in enumerate(to_plot.items()):
+        l = dic['Left']
+        r = dic['Right']
+        error_shade = np.nan
+        l_processed = preproc_averaging(l, averaging=averaging,
+                                        avg_bins=avg_bins, agg='sum')
+        r_processed = preproc_averaging(r, averaging=averaging,
+                                        avg_bins=avg_bins, agg='sum')
+        l_x = l_processed['x']
+        xdata.append(l_x)
+        l_ys = l_processed['ys']
+        r_ys = r_processed['ys']
+        preferences = []
+        for lside, rside in zip(l_ys, r_ys):
+            total = lside + rside
+            if pref_side == "Left":
+                indvl_pref = lside / total * 100
+            else:
+                indvl_pref = rside / total * 100
+            preferences.append(indvl_pref)
+            if avg_var == 'Individual Data':
+                ax.plot(indvl_pref.index, indvl_pref,
+                        color=colors[i], alpha=.5, linewidth=.8)
+        pref_mean = np.nanmean(preferences, axis=0)
+        if avg_var == 'SEM':
+            error_shade = stats.sem(preferences, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            error_shade = np.nanstd(preferences, axis=0)
+        ax.plot(l_x, pref_mean, label=label, color=colors[i])
+        ax.fill_between(l_x, pref_mean-error_shade, pref_mean+error_shade,
+                        color=colors[i], alpha=.3)
+    format_averaging_axes(ax, averaging, xdata)
+    ax.set_ylim(-5, 105)
+    ax.set_title('Averaged Side Preference')
+    ax.set_ylabel('{} Preference (% Drink {})'.format(pref_side, pref_metric))
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
+def averaged_content_preference(sippers, groups, averaging='datetime', avg_bins='1H',
+                                avg_var='SEM', pref_content=[], pref_metric='Count',
+                                shade_dark=True, lights_on=7, lights_off=19, **kwargs):
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    to_plot = defaultdict(lambda: defaultdict((list)))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                for i, c in enumerate(pref_content):
+                    target = sipper.get_content_values(c, out=pref_metric, df=df)
+                    other  = sipper.get_content_values(c, out=pref_metric, df=df,
+                                                       opposite=True)
+                    if not target.empty and not other.empty:
+                        key = group + ' - ' + c
+                        to_plot[key]['target'].append(target.diff())
+                        to_plot[key]['other'].append(other.diff())
+    xdata = []
+    for i, (label, dic) in enumerate(to_plot.items()):
+        target = dic['target']
+        other = dic['other']
+        t_processed = preproc_averaging(target, averaging=averaging,
+                                        avg_bins=avg_bins, agg='sum')
+        o_processed = preproc_averaging(other, averaging=averaging,
+                                        avg_bins=avg_bins, agg='sum')
+        t_x = t_processed['x']
+        xdata.append(t_x)
+        t_ys = t_processed['ys']
+        o_ys = o_processed['ys']
+        preferences = []
+        for tside, oside in zip(t_ys, o_ys):
+            total = tside + oside
+            indvl_pref = tside / total * 100
+            preferences.append(indvl_pref)
+            if avg_var == 'Individual Data':
+                ax.plot(indvl_pref.index, indvl_pref,
+                        color=colors[i], alpha=.5, linewidth=.8)
+        pref_mean = np.nanmean(preferences, axis=0)
+        if avg_var == 'SEM':
+            error_shade = stats.sem(preferences, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            error_shade = np.nanstd(preferences, axis=0)
+        ax.plot(t_x, pref_mean, label=label, color=colors[i])
+        ax.fill_between(t_x, pref_mean-error_shade, pref_mean+error_shade,
+                        color=colors[i], alpha=.3)
+    format_averaging_axes(ax, averaging, xdata)
+    ax.set_ylim(-5, 105)
+    ax.set_title('Averaged Content Preference')
+    ax.set_ylabel('Content Preference (% Drink {})'.format(pref_metric))
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None

@@ -54,7 +54,8 @@ string_args = ['binsize', 'circ_var', 'pref_bins', 'pref_side', 'pref_metric',
 shade_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative',
                'drinkcount_binned', 'drinkduration_binned',
                'side_preference', 'averaged_drinkcount',
-               'averaged_drinkdruation']
+               'averaged_drinkdruation', 'averaged_side_preference',
+               'averaged_content_preference']
 shade_help = '# shading dark periods\n\n'
 shade_help += inspect.getsource(sipperplots.convert_dt64_to_dt) + '\n'
 shade_help += inspect.getsource(sipperplots.hours_between) + '\n'
@@ -65,7 +66,8 @@ shade_help += inspect.getsource(sipperplots.shade_darkness) + '\n'
 date_format_funcs = ['drinkcount_cumulative', 'drinkduration_cumulative',
                      'drinkcount_binned', 'drinkduration_binned',
                      'side_preference', 'averaged_drinkcount',
-                     'averaged_drinkdruation']
+                     'averaged_drinkdruation', 'averaged_side_preference',
+                     'averaged_content_preference']
 date_format_help = '# formatting date x-axis\n\n'
 date_format_help += inspect.getsource(sipperplots.date_format_x) + '\n'
 
@@ -82,7 +84,8 @@ chrono_funcs = ['drinkcount_chronogram', 'drinkcount_chronogram_grouped',
 chrono_help = '# chronograms\n\n'
 chrono_help += inspect.getsource(sipperplots.get_chronogram_vals) + '\n'
 
-avg_funcs = ['averaged_drinkcount', 'averaged_drinkdruation']
+avg_funcs = ['averaged_drinkcount', 'averaged_drinkdruation',
+             'averaged_side_preference', 'averaged_content_preference']
 avg_help = '# averaging\n\n'
 avg_help += inspect.getsource(sipperplots.preproc_averaging) + '\n'
 avg_help += inspect.getsource(sipperplots.format_averaging_axes) + '\n'

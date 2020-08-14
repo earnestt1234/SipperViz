@@ -6,8 +6,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
+#%%
 path = r"C:\Users\earne\Box\20200313 Behavior Study sipper data\4\SIP004_030320_00.CSV"
 path2 = r"C:\Users\earne\Box\20200313 Behavior Study sipper data\4\SIP005_020320_01.CSV"
+
 
 
 t1 = pd.Timestamp(year=2020, month=3, day=3, hour=13)
@@ -27,8 +29,6 @@ sippers = [s, s2]
 for i in sippers:
     i.groups.append('One')
 
-sipperplots.drinkcount_chronogram_grouped(sippers, groups=['One'])
-x = plotdata.drinkcount_chronogram_grouped(sippers, groups=['One'])
 
 #%%
 l = d['LeftCount']
@@ -41,6 +41,10 @@ import os
 
 direc = r"C:\Users\earne\Desktop\same_date_sippers"
 same_dates = []
+t1 = pd.Timestamp(year=2020, month=2, day=3, hour=13)
+t2 = pd.Timestamp(year=2020, month=2, day=6, hour=21)
+t3 = pd.Timestamp(year=2020, month=2, day=13, hour=0)
+
 for p in os.listdir(direc):
     sub = os.path.join(direc, p)
     s = sipper.Sipper(sub)
@@ -48,12 +52,18 @@ for p in os.listdir(direc):
         s.groups.append('B')
     else:
         s.groups.append('A')
+    s.assign_contents(({(t1,t2):("Water","Oxy"),
+                        (t2,t3):("Oxy","Water"),}))
     same_dates.append(s)
+
 
     #%%
 
-sipperplots.averaged_drinkcount(same_dates, groups=['A', 'B'], avg_var='indvls',
-                                averaging='elapsed', avg_bins='7H')
+sipperplots.averaged_content_preference(same_dates, groups=['A'], avg_var='SEM',
+                                        averaging='datetime', avg_bins='4H',
+                                        pref_content=['Water'], pref_metric='Count')
 
-data = plotdata.averaged_drinkcount(same_dates, groups=['A', 'B'], avg_var='indvls',
-                                    averaging='elapsed', avg_bins='7H')
+
+data = plotdata.averaged_content_preference(same_dates, groups=['A'], avg_var='SEM',
+                                        averaging='datetime', avg_bins='4H',
+                                        pref_content=['Water'], pref_metric='Count')

@@ -20,6 +20,19 @@ from sipperplots import (
     preproc_averaging
         )
 
+def format_avg_output(output, averaging):
+    if averaging == 'datetime':
+        output.index.name = 'Date'
+    elif averaging == 'time':
+        first = output.index[0]
+        output.index = [i - first for i in output.index]
+        output.index = (output.index.total_seconds()/3600).astype(int)
+        output.index.name = 'Hours Since {}:00'.format(str(first.hour))
+    elif averaging == 'elapsed':
+        output.index = output.index.astype(int)
+        output.index.name = 'Elapsed Hours'
+    return output
+
 def drinkcount_cumulative(sipper, show_left=True, show_right=True,
                           show_content=[], **kwargs):
     output = pd.DataFrame()
@@ -578,14 +591,103 @@ def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
         elif avg_var == 'STD':
             temp['{} STD'.format(label)] = np.nanstd(ys, axis=0)
         output = output.join(temp, how='outer')
-    if averaging == 'datetime':
-        output.index.name = 'Date'
-    elif averaging == 'time':
-        first = output.index[0]
-        output.index = [i - first for i in output.index]
-        output.index = (output.index.total_seconds()/3600).astype(int)
-        output.index.name = 'Hours Since {}:00'.format(str(first.hour))
-    elif averaging == 'elapsed':
-        output.index = output.index.astype(int)
-        output.index.name = 'Elapsed Hours'
-    return output
+    return format_avg_output(output)
+
+def averaged_side_preference(sippers, groups, averaging='datetime', avg_bins='1H',
+                             avg_var='SEM', pref_side='Left', pref_metric='Count',
+                             shade_dark=True, lights_on=7, lights_off=19, **kwargs):
+    output = pd.DataFrame()
+    to_plot = defaultdict(lambda: defaultdict((list)))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                to_plot[group]['Left'].append(df['Left' + pref_metric].diff().rename(sipper.basename))
+                to_plot[group]['Right'].append(df['Right' + pref_metric].diff().rename(sipper.basename))
+    xdata = []
+    for i, (label, dic) in enumerate(to_plot.items()):
+        temp = pd.DataFrame()
+        l = dic['Left']
+        r = dic['Right']
+        l_processed = preproc_averaging(l, averaging=averaging,
+                                        avg_bins=avg_bins, agg='sum')
+        r_processed = preproc_averaging(r, averaging=averaging,
+                                        avg_bins=avg_bins, agg='sum')
+        l_x = l_processed['x']
+        temp = temp.reindex(l_x)
+        xdata.append(l_x)
+        l_ys = l_processed['ys']
+        r_ys = r_processed['ys']
+        preferences = []
+        for lside, rside in zip(l_ys, r_ys):
+            total = lside + rside
+            if pref_side == "Left":
+                indvl_pref = lside / total * 100
+            else:
+                indvl_pref = rside / total * 100
+            preferences.append(indvl_pref)
+            temp['{} ({})'.format(lside.name, label)] = indvl_pref
+        pref_mean = np.nanmean(preferences, axis=0)
+        temp['{} MEAN'.format(label)] = pref_mean
+        if avg_var == 'SEM':
+            temp['{} SEM'.format(label)] = stats.sem(preferences, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+             temp['{} STD'.format(label)] = np.nanstd(preferences, axis=0)
+        output = output.join(temp, how='outer')
+    return format_avg_output(output, averaging)
+
+def averaged_content_preference(sippers, groups, averaging='datetime', avg_bins='1H',
+                                avg_var='SEM', pref_content=[], pref_metric='Count',
+                                shade_dark=True, lights_on=7, lights_off=19, **kwargs):
+    output = pd.DataFrame()
+    to_plot = defaultdict(lambda: defaultdict((list)))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                for i, c in enumerate(pref_content):
+                    target = sipper.get_content_values(c, out=pref_metric, df=df)
+                    other  = sipper.get_content_values(c, out=pref_metric, df=df,
+                                                       opposite=True)
+                    if not target.empty and not other.empty:
+                        key = group + ' - ' + c
+                        to_plot[key]['target'].append(target.diff().rename(sipper.basename))
+                        to_plot[key]['other'].append(other.diff().rename(sipper.basename))
+    xdata = []
+    for i, (label, dic) in enumerate(to_plot.items()):
+        temp = pd.DataFrame()
+        target = dic['target']
+        other = dic['other']
+        t_processed = preproc_averaging(target, averaging=averaging,
+                                        avg_bins=avg_bins, agg='sum')
+        o_processed = preproc_averaging(other, averaging=averaging,
+                                        avg_bins=avg_bins, agg='sum')
+        t_x = t_processed['x']
+        temp = temp.reindex(t_x)
+        xdata.append(t_x)
+        t_ys = t_processed['ys']
+        o_ys = o_processed['ys']
+        preferences = []
+        for tside, oside in zip(t_ys, o_ys):
+            total = tside + oside
+            indvl_pref = tside / total * 100
+            preferences.append(indvl_pref)
+            temp['{} ({})'.format(tside.name, label)] = indvl_pref
+        pref_mean = np.nanmean(preferences, axis=0)
+        temp['{} MEAN'.format(label)] = pref_mean
+        if avg_var == 'SEM':
+            temp['{} SEM'.format(label)] = stats.sem(preferences, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+             temp['{} STD'.format(label)] = np.nanstd(preferences, axis=0)
+        output = output.join(temp, how='outer')
+    return format_avg_output(output, averaging)

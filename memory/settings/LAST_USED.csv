@@ -23,5 +23,5 @@ pref_side,Right
 pref_metric,Duration
 pref_bins,1 hour
 averaging,Absolute Time
-avg_bins,1 hour
-avg_var,Individual Data
+avg_bins,4 hours
+avg_var,SEM
