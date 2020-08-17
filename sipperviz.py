@@ -593,6 +593,8 @@ class SipperViz(tk.Tk):
                                         command=lambda b=-1: self.move_content(b))
         self.content_movedown = tk.Button(self.assign_frame4, text='Move Down',
                                           command=lambda b=1: self.move_content(b))
+        self.content_set = tk.Button(self.assign_frame4, text='Set Options',
+                                     command=self.set_contents)
         self.content_assign = tk.Button(self.assign_frame4, text='Assign',
                                         command=self.assign_content)
         self.content_cancel = tk.Button(self.assign_frame4, text="Cancel",
@@ -627,9 +629,10 @@ class SipperViz(tk.Tk):
         self.content_delete.grid(row=0, column=1, sticky='nsew', padx=10, pady=5)
         self.content_moveup.grid(row=0, column=2, sticky='nsew', padx=10, pady=5)
         self.content_movedown.grid(row=0, column=3, sticky='nsew', padx=10, pady=5)
-        self.content_assign.grid(row=0, column=4, sticky='nsew', padx=10, pady=5)
-        self.content_cancel.grid(row=0, column=5, sticky='nsew', padx=10, pady=5)
-        for i in range(6):
+        self.content_set.grid(row=0, column=4, sticky='nsew', padx=10, pady=5)
+        self.content_assign.grid(row=0, column=5, sticky='nsew', padx=10, pady=5)
+        self.content_cancel.grid(row=0, column=6, sticky='nsew', padx=10, pady=5)
+        for i in range(7):
             self.assign_frame4.columnconfigure(i, weight=1)
 
     #---create make plot window
@@ -720,8 +723,10 @@ class SipperViz(tk.Tk):
                                       command=self.group_select)
         self.group_delete = tk.Button(self.groups_window, text='Delete Group',
                                       command=self.group_delete)
-        self.group_save = tk.Button(self.groups_window, text='Save Groups')
-        self.group_load = tk.Button(self.groups_window, text='Load Groups')
+        self.group_save = tk.Button(self.groups_window, text='Save Groups',
+                                    command=self.group_save)
+        self.group_load = tk.Button(self.groups_window, text='Load Groups',
+                                    command=self.group_load)
 
         self.groupview_frame.grid(row=0, column=0, sticky='nsew')
         self.groups_window.grid_rowconfigure(0, weight=1)
@@ -770,12 +775,28 @@ class SipperViz(tk.Tk):
         self.config(menu=self.menubar)
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label='Load files', command=self.load_files)
+        self.filemenu.add_command(label='Load folders', command=print)
+        self.filemenu.add_command(label='Save files', command=self.save_files)
+        self.filemenu.add_command(label='Delete files', command=self.delete_files)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label='Save Session', command=print)
+        self.filemenu.add_command(label='Load Session', command=print)
+
+        self.filemenu.add_command(label='Exit', command=self.on_close)
         self.menubar.add_cascade(menu=self.filemenu, label='File')
         self.sippermenu = tk.Menu(self.menubar, tearoff=0)
+        self.sippermenu.add_command(label='Rename tubes', command=print)
+        self.sippermenu.add_separator()
         self.sippermenu.add_command(label='Assign contents', command=self.raise_content_window)
         self.sippermenu.add_command(label='Show/edit file contents',
                                     command=self.raise_content_window_for_file)
         self.sippermenu.add_command(label='Clear contents', command=self.clear_contents)
+        self.sippermenu.add_separator()
+        self.sippermenu.add_command(label='Sort by name', command=print)
+        self.sippermenu.add_command(label='Sort by start date', command=print)
+        self.sippermenu.add_command(label='Sort by end date', command=print)
+        self.sippermenu.add_command(label='Sort by duration', command=print)
+        self.sippermenu.add_command(label='Sort by device number', command=print)
         self.menubar.add_cascade(menu=self.sippermenu, label='Sippers')
         self.plotmenu = tk.Menu(self.menubar, tearoff=0)
         self.plotmenu.add_command(label='Drink Count (Cumulative)', command=lambda:
@@ -1116,7 +1137,8 @@ class SipperViz(tk.Tk):
         self.update_groupview_buttons()
         self.update_makeplot_run()
         self.update_avail_contents()
-        self.update_avail_groups()
+        self.update_groupview_buttons()
+        self.update()
 
     def update_main_buttons(self, *event):
         #if files are selected
@@ -1592,6 +1614,45 @@ class SipperViz(tk.Tk):
         self.display_details()
         self.update_makeplot_run()
 
+    def group_save(self):
+        group_dict = {s.path : s.groups for s in self.loaded_sippers
+                      if s.groups}
+        groups_dir = 'memory/groups'
+        if not os.path.exists(groups_dir):
+            groups_dir = None
+        savepath = tk.filedialog.asksaveasfilename(title='Select where to save group labels',
+                                                   defaultextension='.csv',
+                                                   filetypes=[('Comma-Separated Values', '*.csv')],
+                                                   initialdir=groups_dir)
+        if savepath:
+            df = pd.DataFrame(dict([(k,pd.Series(v)) for k,v in group_dict.items()]))
+            df.to_csv(savepath)
+            del df
+
+    def group_load(self):
+        groups_dir = 'memory/groups'
+        if not os.path.exists(groups_dir):
+            groups_dir = None
+        settings_file = tk.filedialog.askopenfilenames(title='Select group labels to load',
+                                                       defaultextension='.csv',
+                                                       filetypes=[('Comma-Separated Values', '*.csv')],
+                                                       initialdir=groups_dir)
+        if settings_file:
+            df = pd.read_csv(settings_file[0], index_col=0, dtype=str)
+            for s in self.loaded_sippers:
+                lookfor = s.path
+                if lookfor in df.columns:
+                    s.groups = []
+                    for grp in df[lookfor]:
+                        if not pd.isna(grp):
+                            s.groups.append(str(grp))
+        self.update_avail_groups()
+        self.display_details()
+        for g in self.avail_groups:
+            if g not in self.groupview.get_children():
+                self.groupview.insert('', 'end', iid=g, text=g)
+        self.update_all_buttons()
+
     def update_groupview_buttons(self, *event):
         groups = self.groupview.selection()
         files = self.file_view.selection()
@@ -1844,6 +1905,19 @@ class SipperViz(tk.Tk):
         index = self.assign_content_view.index(selected)
         self.assign_content_view.move(selected, '', index + by)
 
+    def set_contents(self):
+        selected = self.assign_content_view.selection()
+        s, e, l, r = self.assign_content_view.item(selected)['values']
+        s = pd.to_datetime(s)
+        e = pd.to_datetime(e)
+        self.sdate_entry.set_date(s)
+        self.shour_entry.set(self.times[s.hour])
+        self.edate_entry.set_date(e)
+        self.ehour_entry.set(self.times[e.hour])
+        self.lcontent_val.set(l)
+        self.rcontent_val.set(r)
+        self.update_content_buttons()
+
     def assign_content(self):
         d = self.get_content_dict()
         files = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
@@ -1870,10 +1944,12 @@ class SipperViz(tk.Tk):
             self.content_moveup.configure(state='normal')
             self.content_movedown.configure(state='normal')
             self.content_delete.configure(state='normal')
+            self.content_set.configure(state='normal')
         else:
             self.content_moveup.configure(state='disabled')
             self.content_movedown.configure(state='disabled')
             self.content_delete.configure(state='disabled')
+            self.content_set.configure(state='disabled')
         if entries:
             self.content_assign.configure(state='normal')
         else:
