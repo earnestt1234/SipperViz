@@ -165,6 +165,8 @@ def night_intervals(array, lights_on, lights_off, instead_days=False):
                                     lights_off=lights_off) for i in array]
     if instead_days:
         at_night = [not i for i in at_night]
+    if len(at_night) == 0:
+        return night_intervals
     night_starts = []
     night_ends = []
     if at_night[0] == True:

@@ -538,10 +538,11 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
     if averaging == 'datetime':
         output.index.name = 'Date'
     elif averaging == 'time':
-        first = output.index[0]
-        output.index = [i - first for i in output.index]
-        output.index = (output.index.total_seconds()/3600).astype(int)
-        output.index.name = 'Hours Since {}:00'.format(str(first.hour))
+        if not output.index.empty:
+            first = output.index[0]
+            output.index = [i - first for i in output.index]
+            output.index = (output.index.total_seconds()/3600).astype(int)
+            output.index.name = 'Hours Since {}:00'.format(str(first.hour))
     elif averaging == 'elapsed':
         output.index = output.index.astype(int)
         output.index.name = 'Elapsed Hours'

@@ -1137,7 +1137,7 @@ class SipperViz(tk.Tk):
         self.update_groupview_buttons()
         self.update_makeplot_run()
         self.update_avail_contents()
-        self.update_groupview_buttons()
+        self.update_avail_groups()
         self.update()
 
     def update_main_buttons(self, *event):
@@ -1563,13 +1563,6 @@ class SipperViz(tk.Tk):
             else:
                 self.warning_var.set('')
                 self.ok_button_create.configure(state=tk.NORMAL)
-
-    # self.group_add = tk.Button(self.groups_window, text='Add Files to Group')
-    # self.group_remove = tk.Button(self.groups_window, text='Remove Files from Group')
-    # self.group_select = tk.Button(self.groups_window, text='Select Files in these Groups')
-    # self.group_delete = tk.Button(self.groups_window, text='Delete Group')
-    # self.group_save = tk.Button(self.groups_window, text='Save Groups')
-    # self.group_load = tk.Button(self.groups_window, text='Load Groups')
 
     def group_add(self):
         groups = self.groupview.selection()
