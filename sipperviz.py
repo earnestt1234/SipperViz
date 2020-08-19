@@ -811,6 +811,9 @@ class SipperViz(tk.Tk):
         self.sippermenu.add_command(label='Clear contents', command=self.clear_contents)
         self.sippermenu.add_separator()
         self.sippermenu.add_command(label='Manage Groups', command=self.raise_group_window)
+        self.sippermenu.add_command(label='Create Group and add files',
+                                    command=lambda addto=True : self.create_group(addto))
+        self.sippermenu.add_command(label='Group by device number', command=self.group_by_device_no)
         self.sippermenu.add_separator()
         self.sippermenu.add_command(label='Concatenate', command=self.concat_files)
         self.sippermenu.add_separator()
@@ -873,10 +876,11 @@ class SipperViz(tk.Tk):
         self.managemenu.add_command(label='Show plot code', command=self.show_plot_code)
         self.managemenu.add_command(label='Save plot data', command=self.save_plot_data)
         self.managemenu.add_separator()
-        self.managemenu.add_command(label='Select used files', command=print)
+        self.managemenu.add_command(label='Select files from plot',
+                                    command=self.select_files_from_plot)
         self.managemenu.add_command(label='Load settings from plot',
                                     command=self.load_settings_from_plot)
-        self.managemenu.add_command(label='Rerun with current settings',
+        self.managemenu.add_command(label='Replot with current settings',
                                     command=self.rerun_plots)
         self.menubar.add_cascade(menu=self.managemenu, label='Manage Plots')
 
@@ -1011,6 +1015,7 @@ class SipperViz(tk.Tk):
                                           command=self.file_view.yview,)
         self.file_view.configure(yscrollcommand=self.files_scroll.set)
         self.file_view.bind('<<TreeviewSelect>>', self.handle_file_select)
+        self.file_view.bind('<ButtonRelease-1>', self.reverse_sort)
         self.file_frame.grid_rowconfigure(0,weight=1)
         self.file_view.grid(row=0, column=0, sticky='nsw')
         self.files_scroll.grid(row=0,column=1,sticky='nsw')
@@ -1138,7 +1143,6 @@ class SipperViz(tk.Tk):
             del(self.loaded_sippers[index])
         self.update_file_view()
         self.update_avail_contents()
-        self.update_all_buttons()
         self.display_details()
 
     def save_files(self):
@@ -1183,6 +1187,7 @@ class SipperViz(tk.Tk):
             self.file_view.insert("", i, str(i), text=s.filename, tag='file')
             if s in select:
                 self.file_view.selection_add(str(i))
+        self.update_all_buttons()
 
     def update_all_buttons(self, *event):
         self.update_main_buttons()
@@ -1191,6 +1196,7 @@ class SipperViz(tk.Tk):
         self.update_makeplot_run()
         self.update_avail_contents()
         self.update_avail_groups()
+        self.update_all_menus()
         self.update()
 
     def update_main_buttons(self, *event):
@@ -1266,7 +1272,13 @@ class SipperViz(tk.Tk):
         selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
         self.loaded_sippers.sort(key = lambda s : getattr(s, key))
         self.update_file_view(select=selected)
-        self.update_all_buttons()
+
+    def reverse_sort(self, event):
+        where_clicked = self.file_view.identify_region(event.x, event.y)
+        if where_clicked == 'heading':
+            selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+            self.loaded_sippers = self.loaded_sippers[::-1]
+            self.update_file_view(select=selected)
 
     def exepath(self, relative):
         try:
@@ -1616,6 +1628,17 @@ class SipperViz(tk.Tk):
         self.rename_window.destroy()
         self.update_all_buttons()
 
+    def select_files_from_plot(self):
+        plotname = self.plot_list.selection()[0]
+        plot = self.loaded_plots[plotname]
+        args = plot.args
+        sippers = []
+        if 'sipper' in args:
+            sippers = [args['sipper']]
+        elif 'sippers' in args:
+            sippers = args['sippers']
+        self.update_file_view(select=sippers)
+
     def rename_check(self, *args):
         new_name = self.rename_var.get()
         if new_name in list(self.loaded_plots.keys()):
@@ -1769,7 +1792,7 @@ class SipperViz(tk.Tk):
         self.update_groupview_buttons()
         self.groups_window.deiconify()
 
-    def create_group(self):
+    def create_group(self, addto=False):
         self.create_window = tk.Toplevel(self)
         self.create_window.title('Enter a group name')
         self.create_name = tk.StringVar()
@@ -1783,7 +1806,7 @@ class SipperViz(tk.Tk):
                          textvariable=self.create_name,
                          width=50)
         self.ok_button_create = tk.Button(self.create_window,text='OK',
-                                          command=lambda: self.create_okay(),
+                                          command=lambda addto=addto: self.create_okay(addto),
                                           state=tk.DISABLED)
         cancel_button = tk.Button(self.create_window,
                                   text='Cancel',
@@ -1795,9 +1818,14 @@ class SipperViz(tk.Tk):
         self.ok_button_create.grid(row=2,column=0,sticky='ew',padx=(20,20),pady=(20,20))
         cancel_button.grid(row=2,column=1,sticky='ew',padx=(20,20),pady=(20,20))
 
-    def create_okay(self):
+    def create_okay(self, addto):
         group_name = self.create_name.get()
         self.loaded_groups.append(group_name)
+        if addto:
+            selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+            for s in selected:
+                if group_name not in s.groups:
+                    s.groups.append(group_name)
         self.groupview.insert('', 'end', iid=group_name, text=group_name)
         self.groupview.selection_set(group_name)
         self.create_window.destroy()
@@ -1895,6 +1923,26 @@ class SipperViz(tk.Tk):
             if g not in self.groupview.get_children():
                 self.groupview.insert('', 'end', iid=g, text=g)
         self.update_all_buttons()
+
+    def group_by_device_no(self):
+        for s in self.loaded_sippers:
+            g = str(s.device_no)
+            s.groups.append(g)
+            if g not in self.loaded_groups:
+                self.loaded_groups.append(g)
+        self.display_details()
+        self.update_group_manager()
+        self.update_avail_groups()
+        self.update_all_buttons()
+
+    def update_group_manager(self):
+        selected = self.groupview.selection()
+        self.groupview.delete(*self.groupview.get_children())
+        for g in self.loaded_groups:
+            self.groupview.insert('', 'end', iid=g, text=g)
+            if g in selected:
+                self.groupview.selection_add(g)
+        self.update()
 
     def update_groupview_buttons(self, *event):
         groups = self.groupview.selection()
@@ -2284,6 +2332,82 @@ class SipperViz(tk.Tk):
                 pass
             else:
                 self.contentselect.selection_add(c)
+
+    #---menu bar
+    def get_menu_index(self, menu, name, limit=20):
+        for i in range(limit):
+            try:
+                if name == menu.entrycget(i, 'label'):
+                    return i
+            except:
+                continue
+
+    def update_file_menu(self):
+        m = self.filemenu
+        if self.file_view.selection():
+            m.entryconfig(self.get_menu_index(m, 'Save files'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Delete files'), state='normal')
+        else:
+            m.entryconfig(self.get_menu_index(m, 'Save files'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Delete files'), state='disabled')
+
+    def update_sippers_menu(self):
+        m = self.sippermenu
+        if self.file_view.selection():
+            m.entryconfig(self.get_menu_index(m, 'Rename tubes'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Assign contents'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Show/edit file contents'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Clear contents'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Concatenate'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Create Group and add files'), state='normal')
+        else:
+            m.entryconfig(self.get_menu_index(m, 'Rename tubes'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Assign contents'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Show/edit file contents'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Clear contents'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Concatenate'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Create Group and add files'), state='disabled')
+        if self.loaded_sippers:
+            m.entryconfig(self.get_menu_index(m, 'Group by device number'), state='normal')
+        else:
+            m.entryconfig(self.get_menu_index(m, 'Group by device number'), state='disabled')
+
+    def update_createplot_menu(self):
+        m = self.plotmenu
+        for plotname in self.plot_default_names.values():
+            if self.is_plottable(plotname):
+                m.entryconfig(self.get_menu_index(m, plotname), state='normal')
+            else:
+                m.entryconfig(self.get_menu_index(m, plotname), state='disabled')
+
+    def update_manageplot_menu(self):
+        m = self.managemenu
+        if self.plot_list.selection():
+            m.entryconfig(self.get_menu_index(m, 'Rename plot'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Save plots'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Delete plots'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Show plot code'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Save plot data'), state='normal')
+        else:
+            m.entryconfig(self.get_menu_index(m, 'Rename plot'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Save plots'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Delete plots'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Show plot code'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Save plot data'), state='disabled')
+        if len(self.plot_list.selection()) == 1:
+            m.entryconfig(self.get_menu_index(m, 'Select files from plot'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Load settings from plot'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Replot with current settings'), state='normal')
+        else:
+            m.entryconfig(self.get_menu_index(m, 'Select files from plot'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Load settings from plot'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Replot with current settings'), state='disabled')
+
+    def update_all_menus(self):
+        self.update_file_menu()
+        self.update_sippers_menu()
+        self.update_createplot_menu()
+        self.update_manageplot_menu()
 
     #---errors
     def raise_load_error(self):
