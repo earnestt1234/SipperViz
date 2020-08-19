@@ -10,7 +10,7 @@ lights_off,7 pm
 show_left,True
 show_right,True
 show_content_val,False
-binsize,1 hour
+binsize,9 hours
 kde,True
 logx,True
 combine,True
@@ -22,6 +22,6 @@ circ_var,SEM
 pref_side,Right
 pref_metric,Duration
 pref_bins,1 hour
-averaging,Absolute Time
+averaging,Relative Time
 avg_bins,4 hours
 avg_var,SEM

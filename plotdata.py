@@ -350,7 +350,6 @@ def drinkcount_chronogram_grouped(sippers, groups, circ_left=True, circ_right=Tr
                             vals.name = sipper.basename
                             to_plot[key].append(vals)
     for i, (label, data) in enumerate(to_plot.items()):
-        x = range(0,24)
         y = np.nanmean(data, axis=0)
         for d in data:
             output[label + ' - ' + d.name] = d
@@ -435,7 +434,6 @@ def drinkduration_chronogram_grouped(sippers, groups, circ_left=True, circ_right
                             vals.name = sipper.basename
                             to_plot[key].append(vals)
     for i, (label, data) in enumerate(to_plot.items()):
-        x = range(0,24)
         y = np.nanmean(data, axis=0)
         for d in data:
             output[label + ' - ' + d.name] = d
@@ -520,7 +518,6 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
                         to_plot[key].append(vals.rename(sipper.basename))
     for i, (label, data) in enumerate(to_plot.items()):
         temp = pd.DataFrame()
-        error_shade = np.nan
         processed = preproc_averaging(data, averaging=averaging,
                                       avg_bins=avg_bins, agg='sum')
         x = processed['x']
@@ -535,18 +532,7 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
         elif avg_var == 'STD':
             temp['{} STD'.format(label)] = np.nanstd(ys, axis=0)
         output = output.join(temp, how='outer')
-    if averaging == 'datetime':
-        output.index.name = 'Date'
-    elif averaging == 'time':
-        if not output.index.empty:
-            first = output.index[0]
-            output.index = [i - first for i in output.index]
-            output.index = (output.index.total_seconds()/3600).astype(int)
-            output.index.name = 'Hours Since {}:00'.format(str(first.hour))
-    elif averaging == 'elapsed':
-        output.index = output.index.astype(int)
-        output.index.name = 'Elapsed Hours'
-    return output
+    return format_avg_output(output, averaging)
 
 def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
                            avg_var='SEM', show_left=True, show_right=True,
@@ -577,7 +563,6 @@ def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
                         to_plot[key].append(vals.rename(sipper.basename))
     for i, (label, data) in enumerate(to_plot.items()):
         temp = pd.DataFrame()
-        error_shade = np.nan
         processed = preproc_averaging(data, averaging=averaging,
                                       avg_bins=avg_bins, agg='sum')
         x = processed['x']
@@ -592,14 +577,13 @@ def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
         elif avg_var == 'STD':
             temp['{} STD'.format(label)] = np.nanstd(ys, axis=0)
         output = output.join(temp, how='outer')
-    return format_avg_output(output)
+    return format_avg_output(output, averaging)
 
 def averaged_side_preference(sippers, groups, averaging='datetime', avg_bins='1H',
                              avg_var='SEM', pref_side='Left', pref_metric='Count',
                              shade_dark=True, lights_on=7, lights_off=19, **kwargs):
     output = pd.DataFrame()
     to_plot = defaultdict(lambda: defaultdict((list)))
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     for group in groups:
         for sipper in sippers:
             if group in sipper.groups:
@@ -647,7 +631,6 @@ def averaged_content_preference(sippers, groups, averaging='datetime', avg_bins=
                                 shade_dark=True, lights_on=7, lights_off=19, **kwargs):
     output = pd.DataFrame()
     to_plot = defaultdict(lambda: defaultdict((list)))
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     for group in groups:
         for sipper in sippers:
             if group in sipper.groups:

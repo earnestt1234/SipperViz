@@ -131,7 +131,6 @@ class Sipper():
             self.data['LeftContents'] = np.nan
         if 'RightContents' not in self.data.columns:
             self.data['RightContents'] = np.nan
-        self.start_date = self.data.index[0]
 
         #informational attributes
         self.basename = os.path.basename(path)
@@ -141,6 +140,7 @@ class Sipper():
             self.device_no = None
         self.left_name = 'Left'
         self.right_name = 'Right'
+        self.start_date = self.data.index[0]
         self.end_date = self.data.index[-1]
         self.duration = self.end_date - self.start_date
         self.contents_dict = self.get_contents_dict()

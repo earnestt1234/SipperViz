@@ -4,11 +4,13 @@ import datetime as dt
 from collections import OrderedDict
 import inspect
 import os
+import pickle
 from PIL import Image, ImageTk
 import sys
 import traceback
 import tkinter as tk
 from tkinter import ttk
+import warnings
 
 import matplotlib as mpl
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -165,6 +167,12 @@ class SipperViz(tk.Tk):
                 ]:
             self.plot_routes[func] = self.group_plot
 
+        #plots which use datetime averaging:
+        self.dt_avg_plots = [sipperplots.averaged_drinkcount,
+                             sipperplots.averaged_drinkduration,
+                             sipperplots.averaged_side_preference,
+                             sipperplots.averaged_content_preference,]
+
         #pretty names for plot arguments, for plot details pane
         self.args_to_names = {'shade_dark':'shade dark',
                               'lights_on': 'lights on',
@@ -198,22 +206,23 @@ class SipperViz(tk.Tk):
         self.loaded_groups = []
         self.avail_contents = []
         self.avail_groups = []
+        self.failed_to_load = []
 
     #---load button images
-        icons = {'gear':self.imagepath("img/settings_icon.gif"),
-                 'bottle':self.imagepath('img/bottle_icon.png'),
-                 'delete_bottle':self.imagepath('img/delete_bottle.png'),
-                 'tack':self.imagepath('img/tack.png'),
-                 'paperclip':self.imagepath('img/paperclip.png'),
-                 'save':self.imagepath('img/save.png'),
-                 'script':self.imagepath('img/script.png'),
-                 'spreadsheet':self.imagepath('img/spreadsheet.png'),
-                 'graph':self.imagepath('img/graph.png'),
-                 'delete_graph':self.imagepath('img/delete_graph.png'),
-                 'picture':self.imagepath('img/picture.png'),
-                 'palette':self.imagepath('img/palette.png'),
-                 'drop':self.imagepath('img/drop.png'),
-                 'swap':self.imagepath('img/swap.png')}
+        icons = {'gear':self.exepath("img/settings_icon.gif"),
+                 'bottle':self.exepath('img/bottle_icon.png'),
+                 'delete_bottle':self.exepath('img/delete_bottle.png'),
+                 'tack':self.exepath('img/tack.png'),
+                 'paperclip':self.exepath('img/paperclip.png'),
+                 'save':self.exepath('img/save.png'),
+                 'script':self.exepath('img/script.png'),
+                 'spreadsheet':self.exepath('img/spreadsheet.png'),
+                 'graph':self.exepath('img/graph.png'),
+                 'delete_graph':self.exepath('img/delete_graph.png'),
+                 'picture':self.exepath('img/picture.png'),
+                 'palette':self.exepath('img/palette.png'),
+                 'drop':self.exepath('img/drop.png'),
+                 'swap':self.exepath('img/swap.png')}
         self.icons = {}
         for k, v in icons.items():
             image = Image.open(v).resize((25, 25))
@@ -231,9 +240,10 @@ class SipperViz(tk.Tk):
     #---create plot settings window
         self.plot_settings_window = tk.Toplevel(self)
         self.plot_settings_window.withdraw()
-        self.plot_settings_window.title('Plotting Settings')
+        self.plot_settings_window.title('Plot Settings')
         self.plot_settings_tabs = ttk.Notebook(self.plot_settings_window)
         self.plot_settings_tabs.pack(fill='both', expand=1)
+        self.plot_settings_window.bind('<Escape>', self.escape)
         self.plot_settings_window.protocol("WM_DELETE_WINDOW",
                                            self.plot_settings_window.withdraw)
 
@@ -538,6 +548,7 @@ class SipperViz(tk.Tk):
         self.contents_window.withdraw()
         self.contents_window.title('Assign Sipper contents')
         self.contents_window.resizable(False, False)
+        self.contents_window.bind('<Escape>', self.escape)
         self.contents_window.protocol("WM_DELETE_WINDOW",
                                       self.close_content_window)
 
@@ -546,7 +557,9 @@ class SipperViz(tk.Tk):
         s1 = 'Enter start and end times for left and right bottle contents.'
         s2 = 'Contents will be assigned to Sippers currently selected in the file view,'
         s3 = 'and they will be assigned in order from top to bottom.'
-        intro = ' '.join([s1, s2, s3])
+        s4 = 'Note: assigning contents to files can change the plots they are part'
+        s5 = 'of when redrawn.'
+        intro = ' '.join([s1, s2, s3, s4, s5])
         self.contents_intro = tk.Label(self.assign_frame1, text=intro,
                                        wraplength=800, justify='left')
         self.assign_frame2 = tk.Frame(self.contents_window)
@@ -640,6 +653,7 @@ class SipperViz(tk.Tk):
         self.makeplot_window.grid_rowconfigure(0, weight=1)
         self.makeplot_window.withdraw()
         self.makeplot_window.resizable(False, True)
+        self.makeplot_window.bind('<Escape>', self.escape)
         self.makeplot_window.title('Create Plots')
         self.makeplot_window.protocol("WM_DELETE_WINDOW",
                                       self.close_makeplot_window)
@@ -697,6 +711,7 @@ class SipperViz(tk.Tk):
         self.groups_window.resizable(False, True)
         self.groups_window.withdraw()
         self.groups_window.title('Group Manager')
+        self.groups_window.bind('<Escape>', self.escape)
         self.groups_window.protocol("WM_DELETE_WINDOW",
                                     self.groups_window.withdraw)
 
@@ -775,28 +790,40 @@ class SipperViz(tk.Tk):
         self.config(menu=self.menubar)
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label='Load files', command=self.load_files)
-        self.filemenu.add_command(label='Load folders', command=print)
+        self.filemenu.add_command(label='Load folder',
+                                  command=lambda : self.load_files(from_folder=True))
         self.filemenu.add_command(label='Save files', command=self.save_files)
         self.filemenu.add_command(label='Delete files', command=self.delete_files)
         self.filemenu.add_separator()
-        self.filemenu.add_command(label='Save Session', command=print)
-        self.filemenu.add_command(label='Load Session', command=print)
-
+        self.filemenu.add_command(label='Save Session', command=self.save_session)
+        self.filemenu.add_command(label='Load Session', command=self.load_session)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label='About', command=print)
+        self.filemenu.add_separator()
         self.filemenu.add_command(label='Exit', command=self.on_close)
         self.menubar.add_cascade(menu=self.filemenu, label='File')
         self.sippermenu = tk.Menu(self.menubar, tearoff=0)
-        self.sippermenu.add_command(label='Rename tubes', command=print)
+        self.sippermenu.add_command(label='Rename tubes', command=self.label_tubes)
         self.sippermenu.add_separator()
         self.sippermenu.add_command(label='Assign contents', command=self.raise_content_window)
         self.sippermenu.add_command(label='Show/edit file contents',
                                     command=self.raise_content_window_for_file)
         self.sippermenu.add_command(label='Clear contents', command=self.clear_contents)
         self.sippermenu.add_separator()
-        self.sippermenu.add_command(label='Sort by name', command=print)
-        self.sippermenu.add_command(label='Sort by start date', command=print)
-        self.sippermenu.add_command(label='Sort by end date', command=print)
-        self.sippermenu.add_command(label='Sort by duration', command=print)
-        self.sippermenu.add_command(label='Sort by device number', command=print)
+        self.sippermenu.add_command(label='Manage Groups', command=self.raise_group_window)
+        self.sippermenu.add_separator()
+        self.sippermenu.add_command(label='Concatenate', command=self.concat_files)
+        self.sippermenu.add_separator()
+        self.sippermenu.add_command(label='Sort by name',
+                                    command = lambda : self.sort_sippers(key='basename'))
+        self.sippermenu.add_command(label='Sort by start date',
+                                    command = lambda : self.sort_sippers(key='start_date'))
+        self.sippermenu.add_command(label='Sort by end date',
+                                    command = lambda : self.sort_sippers(key='end_date'))
+        self.sippermenu.add_command(label='Sort by duration',
+                                    command = lambda : self.sort_sippers(key='duration'))
+        self.sippermenu.add_command(label='Sort by device number',
+                                    command = lambda : self.sort_sippers(key='device_no'))
         self.menubar.add_cascade(menu=self.sippermenu, label='Sippers')
         self.plotmenu = tk.Menu(self.menubar, tearoff=0)
         self.plotmenu.add_command(label='Drink Count (Cumulative)', command=lambda:
@@ -837,6 +864,21 @@ class SipperViz(tk.Tk):
         self.plotmenu.add_command(label='Grouped Chronogram (Drink Duration)', command=lambda:
                                   self.group_plot(sipperplots.drinkduration_chronogram_grouped))
         self.menubar.add_cascade(menu=self.plotmenu, label='Create Plot')
+        self.managemenu = tk.Menu(self.menubar, tearoff=0)
+        self.managemenu.add_command(label='Rename plot', command=self.rename_plot)
+        self.managemenu.add_separator()
+        self.managemenu.add_command(label='Save plots', command=self.save_plots)
+        self.managemenu.add_command(label='Delete plots', command=self.delete_plots)
+        self.managemenu.add_separator()
+        self.managemenu.add_command(label='Show plot code', command=self.show_plot_code)
+        self.managemenu.add_command(label='Save plot data', command=self.save_plot_data)
+        self.managemenu.add_separator()
+        self.managemenu.add_command(label='Select used files', command=print)
+        self.managemenu.add_command(label='Load settings from plot',
+                                    command=self.load_settings_from_plot)
+        self.managemenu.add_command(label='Rerun with current settings',
+                                    command=self.rerun_plots)
+        self.menubar.add_cascade(menu=self.managemenu, label='Manage Plots')
 
     #---create main buttons
         self.button_frame = tk.Frame(self.main_frame)
@@ -1056,12 +1098,18 @@ class SipperViz(tk.Tk):
         self.update_all_buttons()
 
     #---file functions
-    def load_files(self):
-        file_types = [('All', '*.*'), ('Comma-Separated Values', '*.csv'),
-                      ('Excel', '*.xls, *.xslx'),]
-        files = tk.filedialog.askopenfilenames(title='Select FED3 Data',
-                                               filetypes=file_types)
-
+    def load_files(self, from_folder=False):
+        self.failed_to_load = []
+        files = None
+        if from_folder:
+            folder = tk.filedialog.askdirectory(title='Save multiple files')
+            if folder:
+                files = [os.path.join(folder, f) for f in os.listdir(folder)]
+        else:
+            file_types = [('All', '*.*'), ('Comma-Separated Values', '*.csv'),
+                          ('Excel', '*.xls, *.xslx'),]
+            files = tk.filedialog.askopenfilenames(title='Select FED3 Data',
+                                                   filetypes=file_types)
         if files:
             self.loading = True
             self.loading_window.deiconify()
@@ -1072,6 +1120,7 @@ class SipperViz(tk.Tk):
                     try:
                         self.loaded_sippers.append(sipper.Sipper(file))
                     except:
+                        self.failed_to_load.append(file)
                         tb = traceback.format_exc()
                         print(tb)
                 self.loading_bar.step(1/len(files)*100)
@@ -1080,6 +1129,8 @@ class SipperViz(tk.Tk):
             self.update_all_buttons()
             self.loading_window.withdraw()
             self.loading = False
+            if self.failed_to_load:
+                self.raise_load_error()
 
     def delete_files(self):
         selected = [int(i) for i in self.file_view.selection()]
@@ -1124,12 +1175,14 @@ class SipperViz(tk.Tk):
                     self.loaded_sippers.remove(s)
                 self.update_file_view()
         except sipper.SipperError:
-            print('cant concat, add popup')
+            self.raise_concat_error()
 
-    def update_file_view(self):
+    def update_file_view(self, select=[]):
         self.file_view.delete(*self.file_view.get_children())
         for i, s in enumerate(self.loaded_sippers):
             self.file_view.insert("", i, str(i), text=s.filename, tag='file')
+            if s in select:
+                self.file_view.selection_add(str(i))
 
     def update_all_buttons(self, *event):
         self.update_main_buttons()
@@ -1164,11 +1217,58 @@ class SipperViz(tk.Tk):
             self.plot_data_button.configure(state='disabled')
             self.plot_code_button.configure(state='disabled')
 
+    def label_tubes(self):
+        self.label_window = tk.Toplevel(self)
+        self.label_window.title('Label Tubes (Left, Right)')
+        self.left_label_var = tk.StringVar()
+        self.left_label_var.set('Left')
+        self.left_label_var.trace_add('write', self.label_tube_check)
+        self.left_entry = tk.Entry(self.label_window,
+                                   textvariable=self.left_label_var,
+                                   width=50)
+        self.right_label_var = tk.StringVar()
+        self.right_label_var.set('Right')
+        self.right_label_var.trace_add('write', self.label_tube_check)
+        self.right_entry = tk.Entry(self.label_window,
+                                   textvariable=self.right_label_var,
+                                   width=50)
+        self.label_ok_button = tk.Button(self.label_window, text='Rename',
+                                         command=self.label_okay)
+        self.label_cancel_button = tk.Button(self.label_window,
+                                             text='Cancel',
+                                             command=self.label_window.destroy)
+        self.left_entry.grid(row=0, column=0, sticky='ew', padx=(20,20), pady=(20,0),
+                                   columnspan=2)
+        self.right_entry.grid(row=1, column=0, sticky='ew', padx=(20,20), pady=(20,0),
+                                    columnspan=2)
+        self.label_ok_button.grid(row=2,column=0,sticky='ew',padx=(20,20),pady=(20,20))
+        self.label_cancel_button.grid(row=2,column=1,sticky='ew',padx=(20,20),pady=(20,20))
+
+    def label_tube_check(self, *events):
+        if not self.left_label_var.get() or not self.right_label_var.get():
+            self.label_ok_button.configure(state='disabled')
+        else:
+            self.label_ok_button.configure(state='normal')
+
+    def label_okay(self):
+        selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+        for s in selected:
+            s.left_name = self.left_label_var.get()
+            s.right_name = self.right_label_var.get()
+        self.update_all_buttons()
+        self.display_details()
+
     def handle_file_select(self, *event):
         self.display_details()
         self.update_all_buttons()
 
-    def imagepath(self, relative):
+    def sort_sippers(self, key='basename'):
+        selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+        self.loaded_sippers.sort(key = lambda s : getattr(s, key))
+        self.update_file_view(select=selected)
+        self.update_all_buttons()
+
+    def exepath(self, relative):
         try:
             imgpath = os.path.join(os.path.dirname(sys.executable), relative)
             if not os.path.exists(imgpath):
@@ -1176,6 +1276,56 @@ class SipperViz(tk.Tk):
         except:
             imgpath = relative
         return imgpath
+
+    #---sessions
+    def save_session(self, dialog=True):
+        if dialog:
+            sessions_dir = None
+            if os.path.isdir(self.exepath('memory/sessions')):
+                sessions_dir = self.exepath('memory/sessions')
+            savepath = tk.filedialog.asksaveasfilename(title='Select where to save session file',
+                                                       defaultextension='.sip',
+                                                       filetypes = [('SipViz Session (pickled file)', '*.sip')],
+                                                       initialdir=sessions_dir)
+        else:
+            savepath = self.exepath('memory/sessions')
+            if not os.path.isdir(savepath):
+                print("Cannot automatically find Sessions dir - Session not saved")
+                return
+            else:
+                savepath = os.path.join(savepath, 'LAST_USED.sip')
+        if savepath:
+            jarred = {}
+            jarred['sippers'] = self.loaded_sippers
+            jarred_plots = OrderedDict()
+            for name, obj in self.loaded_plots.items():
+                saved_args = {key:val for key, val in obj.args.items() if key != 'ax'}
+                jarred_plots[name] = SipperPlot(name=obj.name,
+                                                func=obj.func,
+                                                args=saved_args,
+                                                data=obj.data,)
+            jarred['plots'] = jarred_plots
+            jarred['settings'] = self.get_settings_df()
+            pickle.dump(jarred, open(savepath, 'wb'))
+
+    def load_session(self):
+        sessions_dir = None
+        if os.path.isdir(self.exepath('memory/sessions')):
+            sessions_dir = self.exepath('memory/sessions')
+        session_file = tk.filedialog.askopenfilenames(title='Select a session file to load',
+                                                      initialdir=sessions_dir,
+                                                      multiple=False)
+        if session_file:
+            unjarred = pickle.load(open(session_file[0],'rb'))
+            self.loaded_sippers = unjarred['sippers']
+            self.update_file_view()
+            self.delete_plots(all=True)
+            self.loaded_plots = unjarred['plots']
+            for plot in self.loaded_plots:
+                self.loaded_plots[plot].args['ax'] = self.ax
+                self.display_plot(self.loaded_plots[plot], insert=True)
+            self.update_all_buttons()
+            # self.load_settings(dialog=False, from_df=unjarred['settings'])
 
     #---info pane functions
     def display_details(self, *event):
@@ -1225,7 +1375,7 @@ class SipperViz(tk.Tk):
                 plot = SipperPlot(name, func, args, data)
                 self.loaded_plots[name] = plot
                 self.plot_list.insert('', 'end', iid=plot.name, values=[plot.name])
-                self.display_plot(plot, new=True)
+                self.display_plot(plot)
         if self.bad_date_sippers:
             self.raise_dfilter_error()
         self.plotting = False
@@ -1255,7 +1405,7 @@ class SipperViz(tk.Tk):
         plot = SipperPlot(name, func, args, data)
         self.loaded_plots[name] = plot
         self.plot_list.insert('', 'end', iid=plot.name, values=[plot.name])
-        self.display_plot(plot, new=True)
+        self.display_plot(plot)
 
     def group_plot(self, func):
         self.bad_date_sippers = []
@@ -1280,6 +1430,15 @@ class SipperViz(tk.Tk):
         if self.bad_date_sippers:
             self.raise_dfilter_error()
             return
+        if func in self.dt_avg_plots:
+            dt = None
+            if self.date_filter_val.get():
+                b,e = self.get_date_filter_dates()
+                dt = (b,e)
+            if args['averaging'] == 'datetime':
+                if not self.datetime_averageable(sippers, date_filter=dt):
+                    self.raise_average_warning()
+                    return
         args['sippers'] = sippers
         args['groups'] = groups
         args['ax'] = self.ax
@@ -1288,14 +1447,16 @@ class SipperViz(tk.Tk):
         plot = SipperPlot(name, func, args, data)
         self.loaded_plots[name] = plot
         self.plot_list.insert('', 'end', iid=plot.name, values=[plot.name])
-        self.display_plot(plot, new=True)
+        self.display_plot(plot)
 
     #---plotting functions
-    def display_plot(self, plot, new=False, select=True):
+    def display_plot(self, plot, insert=False, select=True):
         self.suspend_plot_raising = True
         self.ax.clear()
         self.display_plot_details(plot)
         plot.func(**plot.args)
+        if insert:
+            self.plot_list.insert('', 'end', iid=plot.name, values=[plot.name])
         if select:
             self.plot_list.selection_remove(self.plot_list.selection())
             self.plot_list.selection_set(plot.name)
@@ -1310,6 +1471,17 @@ class SipperViz(tk.Tk):
             if len(clicked) == 1:
                 plot = self.loaded_plots[clicked[0]]
                 self.display_plot(plot)
+
+    def rerun_plots(self):
+        for i in self.plot_list.selection():
+            plot = self.loaded_plots[i]
+            func = plot.func
+            prettyname = self.plot_default_names[func]
+            if self.is_plottable(prettyname):
+                route_func = self.plot_routes[func]
+                route_func(func)
+            else:
+                warnings.warn('Plot is not plottable with current settings.')
 
     def display_plot_details(self, plot):
         self.plot_info.delete(*self.plot_info.get_children())
@@ -1330,33 +1502,60 @@ class SipperViz(tk.Tk):
     def is_plottable(self, graphname):
         plottable = False
         if graphname in [
-                'Drink Count (Cumulative)',
-                'Drink Duration (Cumulative)',
-                'Drink Count (Binned)',
-                'Drink Duration (Binned)',
-                'Interpellet Intervals',
-                'Interpellet Intervals (By Side)',
-                'Chronogram (Drink Count)',
-                'Chronogram (Drink Duration)',
+            'Drink Count (Cumulative)',
+            'Drink Duration (Cumulative)',
+            'Drink Count (Binned)',
+            'Drink Duration (Binned)',
+            ]:
+            if self.file_view.selection():
+                if (self.drink_showleft_val.get() or
+                    self.drink_showright_val.get() or
+                    (self.drink_showcontent_val.get() and self.contentselect.selection())):
+                    plottable = True
+        if graphname in [
+                'Interdrink Intervals',
+                'Interdrink Intervals (By Side)',
                 'Side Preference'
                 ]:
             if self.file_view.selection():
                 plottable = True
         if graphname in [
-                'Interpellet Intervals (By Content)',
+                'Chronogram (Drink Count)',
+                'Chronogram (Drink Duration)']:
+            if self.file_view.selection():
+                if (self.circ_showleft_val.get() or
+                    self.circ_showright_val.get() or
+                    (self.circ_showcontent_val.get() and self.contentselect.selection())):
+                    plottable = True
+        if graphname in [
+                'Interdrink Intervals (By Content)',
                 'Content Preference'
                 ]:
-            if self.contentselect.selection():
+            if self.file_view.selection() and self.contentselect.selection():
                 plottable = True
         if graphname in [
                 'Grouped Chronogram (Drink Count)',
-                'Grouped Chronogram (Drink Duration)',
-                'Average Drink Count',
-                'Average Drink Duration',
-                'Average Side Preference',
-                'Average Content Preference'
+                'Grouped Chronogram (Drink Duration)'
                 ]:
             if self.groupselect.selection():
+                if (self.circ_showleft_val.get() or
+                    self.circ_showright_val.get() or
+                    (self.circ_showcontent_val.get() and self.contentselect.selection())):
+                    plottable = True
+        if graphname in [
+                'Average Drink Count',
+                'Average Drink Duration',
+                ]:
+            if self.groupselect.selection():
+                if (self.drink_showleft_val.get() or
+                    self.drink_showright_val.get() or
+                    (self.drink_showcontent_val.get() and self.contentselect.selection())):
+                    plottable = True
+        if graphname == 'Average Side Preference':
+            if self.groupselect.selection():
+                plottable = True
+        if graphname == 'Average Content Preference':
+            if self.groupselect.selection() and self.contentselect.selection():
                 plottable = True
         return plottable
 
@@ -1378,6 +1577,54 @@ class SipperViz(tk.Tk):
     def close_makeplot_window(self):
         self.makeplot_window.withdraw()
 
+    def rename_plot(self):
+        self.old_name = self.plot_list.selection()[0]
+        self.rename_window = tk.Toplevel(self)
+        self.rename_window.grab_set()
+        self.rename_window.title('Rename plot: ' + self.old_name)
+        self.rename_var = tk.StringVar()
+        self.rename_var.set(self.old_name)
+        self.rename_var.trace_add('write',self.rename_check)
+        self.warning_var = tk.StringVar()
+        self.warning_var.set('')
+        self.warning_label = tk.Label(self.rename_window,
+                                      textvariable=self.warning_var)
+        self.entry = tk.Entry(self.rename_window,
+                         textvariable=self.rename_var,
+                         width=50)
+        self.ok_button = tk.Button(self.rename_window,text='OK',
+                              command=lambda: self.rename_okay())
+        self.cancel_button = tk.Button(self.rename_window,
+                                       text='Cancel',
+                                       command=self.rename_window.destroy)
+        self.warning_label.grid(row=0,column=0, sticky='w',
+                                columnspan=2,padx=(20,0),pady=(20,0))
+        self.entry.grid(row=1,column=0,sticky='ew',padx=(20,20),pady=(20,0),
+                   columnspan=2)
+        self.ok_button.grid(row=2,column=0,sticky='ew',padx=(20,20),pady=(20,20))
+        self.cancel_button.grid(row=2,column=1,sticky='ew',padx=(20,20),pady=(20,20))
+
+    def rename_okay(self):
+        new_name = self.rename_var.get()
+        self.loaded_plots = OrderedDict([(new_name, v) if k == self.old_name
+                                         else (k, v) for k, v in
+                                         self.loaded_plots.items()])
+        self.loaded_plots[new_name].name = new_name
+        new_position = list(self.loaded_plots.keys()).index(new_name)
+        self.plot_list.delete(self.old_name)
+        self.plot_list.insert('', new_position, iid=new_name, values=[new_name])
+        self.rename_window.destroy()
+        self.update_all_buttons()
+
+    def rename_check(self, *args):
+        new_name = self.rename_var.get()
+        if new_name in list(self.loaded_plots.keys()):
+            self.warning_var.set('Name already in use!')
+            self.ok_button.configure(state=tk.DISABLED)
+        else:
+            self.warning_var.set('')
+            self.ok_button.configure(state=tk.NORMAL)
+
     def run_makeplots(self):
         for i in self.makeplot_selection.selection():
             graphname = self.makeplot_selection.item(i)['text']
@@ -1387,8 +1634,11 @@ class SipperViz(tk.Tk):
                 route_func(plot_func)
 
     #---plot button functions
-    def delete_plots(self):
-        selected = self.plot_list.selection()
+    def delete_plots(self, all=False):
+        if all == True:
+            selected = self.plot_list.get_children()
+        else:
+            selected = self.plot_list.selection()
         self.plot_list.delete(*selected)
         for name in selected:
             del self.loaded_plots[name]
@@ -1610,7 +1860,7 @@ class SipperViz(tk.Tk):
     def group_save(self):
         group_dict = {s.path : s.groups for s in self.loaded_sippers
                       if s.groups}
-        groups_dir = 'memory/groups'
+        groups_dir = self.exepath('memory/groups')
         if not os.path.exists(groups_dir):
             groups_dir = None
         savepath = tk.filedialog.asksaveasfilename(title='Select where to save group labels',
@@ -1623,7 +1873,7 @@ class SipperViz(tk.Tk):
             del df
 
     def group_load(self):
-        groups_dir = 'memory/groups'
+        groups_dir = self.exepath('memory/groups')
         if not os.path.exists(groups_dir):
             groups_dir = None
         settings_file = tk.filedialog.askopenfilenames(title='Select group labels to load',
@@ -1733,6 +1983,25 @@ class SipperViz(tk.Tk):
         settings_dict['averaging'] = method_d[settings_dict['averaging']]
         return settings_dict
 
+    def revert_settings_dict(self, settings_dict):
+        def get_key(value, dictionary):
+            items = dictionary.items()
+            for key, val in items:
+                if value==val:
+                    return key
+        for time_setting in ['lights_on', 'lights_off']:
+            if time_setting in settings_dict:
+                settings_dict[time_setting] = get_key(settings_dict[time_setting], self.times_to_int)
+        for bin_setting in ['binsize', 'pref_bins', 'avg_bins']:
+            if bin_setting in settings_dict:
+                settings_dict[bin_setting] = get_key(settings_dict[bin_setting], self.bin_convert)
+        method_d = {'Absolute Time' : 'datetime',
+                    'Relative Time': 'time',
+                    'Elapsed Time': 'elpased'}
+        if 'averaging' in settings_dict:
+            settings_dict['averaging'] = get_key(settings_dict['averaging'], method_d)
+        return settings_dict
+
     def get_settings_df(self):
         d = self.get_settings_dict()
         settings_df = pd.DataFrame(columns=['Value'])
@@ -1740,54 +2009,87 @@ class SipperViz(tk.Tk):
             settings_df.loc[k, 'Value'] = v
         return settings_df
 
-    def load_settings_df(self, path):
+    def load_settings_df(self, path='', from_df=pd.DataFrame()):
         if os.path.exists(path):
-            pass
+            df = pd.read_csv(path, index_col=0)
+        elif not from_df.empty:
+            df = from_df
         else:
             path = tk.filedialog.askopenfilenames(title='Select FED3 Data',
                                                   defaultextension='.csv',
                                                   filetypes=[('Comma-Separated Values', '*.csv')],
                                                   initialdir='memory/settings')
-        if path:
-            df = pd.read_csv(path, index_col=0)
-            v = 'Value'
-            self.shade_dark_val.set(df.loc['shade_dark', v])
-            self.lightson_menu.set(df.loc['lights_on', v])
-            self.lightsoff_menu.set(df.loc['lights_off', v])
-            self.drink_showleft_val.set(df.loc['show_left', v])
-            self.drink_showright_val.set(df.loc['show_right', v])
-            self.drink_showcontent_val.set(df.loc['show_content_val', v])
-            self.drink_binsize_menu.set(df.loc['binsize', v])
-            self.kde_val.set(df.loc['kde', v])
-            self.logx_val.set(df.loc['logx', v])
-            self.combine_idi_val.set(df.loc['combine', v])
-            s = pd.to_datetime(df.loc['dfilter_sdate', v])
-            e = pd.to_datetime(df.loc['dfilter_edate', v])
-            if str(self.dfilter_s_date.cget('state')) == 'disabled':
-                self.dfilter_s_date.configure(state='normal')
-                self.dfilter_s_date.set_date(s)
-                self.dfilter_s_date.configure(state='disabled')
+            if path:
+                df = pd.read_csv(path, index_col=0)
             else:
-                self.dfilter_s_date.set_date(s)
-            if str(self.dfilter_e_date.cget('state')) == 'disabled':
-                self.dfilter_e_date.configure(state='normal')
-                self.dfilter_e_date.set_date(e)
-                self.dfilter_e_date.configure(state='disabled')
-            else:
-                self.dfilter_e_date.set_date(e)
-            self.dfilter_s_hour.set(df.loc['dfilter_shour', v])
-            self.dfilter_e_hour.set(df.loc['dfilter_ehour', v])
-            self.circ_showleft_val.set(df.loc['circ_left', v])
-            self.circ_showright_val.set(df.loc['circ_right', v])
-            self.circ_showcontent_val.set(df.loc['circ_content', v])
-            self.circ_showindvl_val.set(df.loc['circ_show_indvl', v])
-            self.circ_var_menu.set(df.loc['circ_var', v])
-            self.side_pref_var.set(df.loc['pref_side', v])
-            self.pref_metric_var.set(df.loc['pref_metric', v])
-            self.pref_binsize_menu.set(df.loc['pref_bins', v])
-            self.avg_method_menu.set(df.loc['averaging', v])
-            self.avg_bins_menu.set(df.loc['avg_bins', v])
-            self.avg_var_menu.set(df.loc['avg_var', v])
+                return
+        v = 'Value'
+        self.shade_dark_val.set(df.loc['shade_dark', v])
+        self.lightson_menu.set(df.loc['lights_on', v])
+        self.lightsoff_menu.set(df.loc['lights_off', v])
+        self.drink_showleft_val.set(df.loc['show_left', v])
+        self.drink_showright_val.set(df.loc['show_right', v])
+        self.drink_showcontent_val.set(df.loc['show_content_val', v])
+        self.drink_binsize_menu.set(df.loc['binsize', v])
+        self.kde_val.set(df.loc['kde', v])
+        self.logx_val.set(df.loc['logx', v])
+        self.combine_idi_val.set(df.loc['combine', v])
+        s = pd.to_datetime(df.loc['dfilter_sdate', v])
+        e = pd.to_datetime(df.loc['dfilter_edate', v])
+        if str(self.dfilter_s_date.cget('state')) == 'disabled':
+            self.dfilter_s_date.configure(state='normal')
+            self.dfilter_s_date.set_date(s)
+            self.dfilter_s_date.configure(state='disabled')
+        else:
+            self.dfilter_s_date.set_date(s)
+        if str(self.dfilter_e_date.cget('state')) == 'disabled':
+            self.dfilter_e_date.configure(state='normal')
+            self.dfilter_e_date.set_date(e)
+            self.dfilter_e_date.configure(state='disabled')
+        else:
+            self.dfilter_e_date.set_date(e)
+        self.dfilter_s_hour.set(df.loc['dfilter_shour', v])
+        self.dfilter_e_hour.set(df.loc['dfilter_ehour', v])
+        self.circ_showleft_val.set(df.loc['circ_left', v])
+        self.circ_showright_val.set(df.loc['circ_right', v])
+        self.circ_showcontent_val.set(df.loc['circ_content', v])
+        self.circ_showindvl_val.set(df.loc['circ_show_indvl', v])
+        self.circ_var_menu.set(df.loc['circ_var', v])
+        self.side_pref_var.set(df.loc['pref_side', v])
+        self.pref_metric_var.set(df.loc['pref_metric', v])
+        self.pref_binsize_menu.set(df.loc['pref_bins', v])
+        self.avg_method_menu.set(df.loc['averaging', v])
+        self.avg_bins_menu.set(df.loc['avg_bins', v])
+        self.avg_var_menu.set(df.loc['avg_var', v])
+
+    def load_settings_from_plot(self):
+        current_settings_df = self.get_settings_df()
+        name = self.plot_list.selection()[0]
+        plot = self.loaded_plots[name]
+        used_args = {k:v for k,v in plot.args.items() if k != 'ax'}
+        used_args = self.revert_settings_dict(used_args)
+        change_df = current_settings_df
+        c_list = []
+        for arg in used_args.keys():
+            if arg in change_df.index:
+                change_df.loc[arg,'Value'] = used_args[arg]
+            if arg in ['show_content', 'circ_content', 'pref_content']:
+                c_list = used_args[arg]
+        self.load_settings_df(from_df=change_df)
+        if c_list:
+            if any(c in self.avail_contents for c in c_list):
+                self.contentselect.selection_remove(*self.contentselect.selection())
+                for c in c_list:
+                    if c in self.contentselect.get_children():
+                        self.contentselect.selection_add(c)
+        if 'groups' in used_args:
+            groups = used_args['groups']
+            if any(g in self.avail_groups for g in groups):
+                self.groupselect.selection_remove(*self.groupselect.selection())
+                for g in groups:
+                    if g in self.groupselect.get_children():
+                        self.groupselect.selection_add(g)
+        self.update_all_buttons()
 
     def set_date_filter_state(self):
         if self.date_filter_val.get():
@@ -1984,10 +2286,23 @@ class SipperViz(tk.Tk):
                 self.contentselect.selection_add(c)
 
     #---errors
+    def raise_load_error(self):
+        warn_window = tk.Toplevel(self)
+        warn_window.grab_set()
+        warn_window.title('Loading Errors')
+        # if not platform.system() == 'Darwin':
+        #     warn_window.iconbitmap('img/exclam.ico')
+        text = ("The following files could not be loaded.\n" +
+                '\nThey were likely either not CSV/XLSX, not Sipper data, or were empty:\n')
+        for s in self.failed_to_load:
+            text += '\n  - ' + s
+        warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
+        warning.pack(padx=(20,20),pady=(20,20))
+
     def raise_dfilter_error(self):
         warn_window = tk.Toplevel(self)
         warn_window.grab_set()
-        warn_window.title('Date filter error')
+        warn_window.title('Date Filter Errors')
         # if not platform.system() == 'Darwin':
         #     warn_window.iconbitmap('img/exclam.ico')
         text = ("The following files did not have any data within the date filter" +
@@ -1997,12 +2312,50 @@ class SipperViz(tk.Tk):
         warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
         warning.pack(padx=(20,20),pady=(20,20))
 
+    def raise_concat_error(self):
+        warn_window = tk.Toplevel(self)
+        warn_window.grab_set()
+        warn_window.title('Concatenation Error')
+        text = ("The selected files have overlapping dates and could not be concatenated.")
+        warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
+        warning.pack(padx=(20,20),pady=(20,20))
+
+    def datetime_averageable(self, sippers, date_filter=None):
+        earliest_end = pd.Timestamp(year=2200, month=1, day=1, hour=0,
+                                        minute=0, second=0)
+        latest_start = pd.Timestamp(year=1970, month=1, day=1, hour=0,
+                                    minute=0, second=0)
+        for s in sippers:
+            df = s.data.copy()
+            if date_filter is not None:
+                s, e = date_filter
+                df = df[(df.index >= s) &
+                        (df.index <= e)].copy()
+            if min(df.index) > latest_start:
+                latest_start = min(df.index)
+            if max(df.index) < earliest_end:
+                earliest_end = max(df.index)
+        return False if earliest_end < latest_start else True
+
+    def raise_average_warning(self):
+        warn_window = tk.Toplevel(self)
+        warn_window.grab_set()
+        warn_window.title('Absolute Time Averaging Error')
+        text = ("There are no intervals where the selected files all overlap." +
+                '\n\nYou can still make an average pellet plot by changing the' +
+                '\naveraging method from Plot Settings > Averaging > Averaging method.')
+        warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
+        warning.pack(padx=(20,20),pady=(20,20))
+
     #---run before closing:
     def on_close(self):
-        settings_dir = 'memory/settings'
+        settings_dir = self.exepath('memory/settings')
         if os.path.isdir(settings_dir):
             settings_df = self.get_settings_df()
             settings_df.to_csv(os.path.join(settings_dir, 'LAST_USED.csv'))
+        sessions_dir = self.exepath('memory/sessions')
+        if os.path.isdir(sessions_dir):
+            self.save_session(dialog=False)
         self.destroy()
         self.quit()
 
