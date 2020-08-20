@@ -1,16 +1,17 @@
 ,Value
+lights_on,7 am
+lights_off,7 pm
+groupload_abs,True
 dfilter_val,False
-dfilter_sdate,2015-08-07
-dfilter_edate,2015-08-19
+dfilter_sdate,2020-08-20
+dfilter_edate,2020-08-20
 dfilter_shour,noon
 dfilter_ehour,noon
 shade_dark,True
-lights_on,7 am
-lights_off,7 pm
 show_left,True
 show_right,True
-show_content_val,False
-binsize,9 hours
+show_content_val,True
+binsize,1 hour
 kde,True
 logx,True
 combine,True
@@ -19,9 +20,9 @@ circ_right,True
 circ_content,True
 circ_show_indvl,False
 circ_var,SEM
-pref_side,Right
-pref_metric,Duration
+pref_side,Left
+pref_metric,Count
 pref_bins,1 hour
-averaging,Relative Time
-avg_bins,4 hours
+averaging,Absolute Time
+avg_bins,1 hour
 avg_var,SEM

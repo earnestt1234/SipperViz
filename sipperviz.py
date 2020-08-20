@@ -537,11 +537,28 @@ class SipperViz(tk.Tk):
         self.lightson_menu.set('7 am')
         self.lightsoff_menu = ttk.Combobox(self.general_settings, width=10,
                                            values=self.times)
+
+        self.groupload_abs_val = tk.BooleanVar()
+        self.groupload_abs_val.set(True)
+        self.groupload_abs_box = ttk.Checkbutton(self.general_settings,
+                                                 text='When loading groups, use absolute path (rather than file name)',
+                                                 var=self.groupload_abs_val)
+
+        self.load_dups_val = tk.BooleanVar()
+        self.load_dups_val.set(True)
+        self.load_dups_box = ttk.Checkbutton(self.general_settings,
+                                             text="Don't load files who's file names are already present in SipperViz.",
+                                             var=self.load_dups_val)
+
         self.lightsoff_menu.set('7 pm')
-        self.lightson_label.grid(row=0, column=0, sticky='nsw', padx=20)
-        self.lightson_menu.grid(row=0,column=1, sticky='nsew', padx=20)
-        self.lightsoff_label.grid(row=1, column=0, sticky='nsw', padx=20)
-        self.lightsoff_menu.grid(row=1,column=1, sticky='nsew', padx=20)
+        self.lightson_label.grid(row=0, column=0, sticky='nsw', padx=20, pady=5)
+        self.lightson_menu.grid(row=0,column=1, sticky='nsew', padx=20, pady=5)
+        self.lightsoff_label.grid(row=1, column=0, sticky='nsw', padx=20, pady=5)
+        self.lightsoff_menu.grid(row=1,column=1, sticky='nsew', padx=20, pady=5)
+        self.groupload_abs_box.grid(row=2, column=0, sticky='nsew', padx=20, pady=5,
+                                    columnspan=2)
+        self.load_dups_box.grid(row=3, column=0, sticky='nsew', padx=20, pady=5,
+                                columnspan=2)
 
     #---create assign contents window
         self.contents_window = tk.Toplevel(self)
@@ -1094,7 +1111,7 @@ class SipperViz(tk.Tk):
     #---operations pre opening
         last_settings = 'memory/settings/LAST_USED.CSV'
         if os.path.isfile(last_settings):
-            self.load_settings_df(last_settings) #for testing
+            # self.load_settings_df(last_settings) #for testing
             try:
                 self.load_settings_df(last_settings)
             except:
@@ -1910,8 +1927,13 @@ class SipperViz(tk.Tk):
                                                        initialdir=groups_dir)
         if settings_file:
             df = pd.read_csv(settings_file[0], index_col=0, dtype=str)
+            if self.groupload_abs_val.get():
+                attr = 'path'
+            else:
+                attr = 'basename'
+                df.columns = [os.path.basename(col) for col in df.columns]
             for s in self.loaded_sippers:
-                lookfor = s.path
+                lookfor = getattr(s, attr)
                 if lookfor in df.columns:
                     s.groups = []
                     for grp in df[lookfor]:
@@ -1984,14 +2006,16 @@ class SipperViz(tk.Tk):
 
     #---settings functions
     def get_settings_dict(self):
-        settings_dict = dict(dfilter_val     =self.date_filter_val.get(),
+        settings_dict = dict(lights_on       =self.lightson_menu.get(),
+                             lights_off      =self.lightsoff_menu.get(),
+                             groupload_abs   =self.groupload_abs_val.get(),
+                             load_dups       =self.load_dups_val.get(),
+                             dfilter_val     =self.date_filter_val.get(),
                              dfilter_sdate   =self.dfilter_s_date.get_date(),
                              dfilter_edate   =self.dfilter_e_date.get_date(),
                              dfilter_shour   =self.dfilter_s_hour.get(),
                              dfilter_ehour   =self.dfilter_e_hour.get(),
                              shade_dark      =self.shade_dark_val.get(),
-                             lights_on       =self.lightson_menu.get(),
-                             lights_off      =self.lightsoff_menu.get(),
                              show_left       =self.drink_showleft_val.get(),
                              show_right      =self.drink_showright_val.get(),
                              show_content_val=self.drink_showcontent_val.get(),
@@ -2075,6 +2099,8 @@ class SipperViz(tk.Tk):
         self.shade_dark_val.set(df.loc['shade_dark', v])
         self.lightson_menu.set(df.loc['lights_on', v])
         self.lightsoff_menu.set(df.loc['lights_off', v])
+        self.groupload_abs_val.set(df.loc['groupload_abs', v])
+        self.load_dups_val.set(df.loc['load_dups', v])
         self.drink_showleft_val.set(df.loc['show_left', v])
         self.drink_showright_val.set(df.loc['show_right', v])
         self.drink_showcontent_val.set(df.loc['show_content_val', v])
