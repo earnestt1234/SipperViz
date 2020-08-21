@@ -610,7 +610,7 @@ def interdrink_intervals(sippers, kde=True, logx=True,
                     (df.index <= e)].copy()
         y = get_any_idi(sipper)
         if logx:
-            y = [np.log10(val) for val in y if not pd.isna(val)]
+            y = [np.log10(val) for val in y if not pd.isna(val) if val != 0]
             bins = np.round(np.arange(-2, 5, .1), 2)
         else:
             bins = np.linspace(0, 900, 50)
@@ -646,7 +646,7 @@ def interdrink_intervals_byside(sippers, kde=True, logx=True, **kwargs):
                         (df.index <= e)].copy()
             y = get_side_idi(sipper, side)
             if logx:
-                y = [np.log10(val) for val in y if not pd.isna(val)]
+                y = [np.log10(val) for val in y if not pd.isna(val) if val != 0]
                 bins = np.round(np.arange(-2, 5, .1), 2)
             else:
                 bins = np.linspace(0, 900, 50)
@@ -675,7 +675,7 @@ def interdrink_intervals_bycontent(sippers, show_content, kde=True, logx=True, *
                         (df.index <= e)].copy()
             y = get_content_idi(sipper, c, df=df)
             if logx:
-                y = [np.log10(val) for val in y if not pd.isna(val)]
+                y = [np.log10(val) for val in y if not pd.isna(val) if val != 0]
                 bins = np.round(np.arange(-2, 5, .1), 2)
             else:
                 bins = np.linspace(0, 900, 50)
