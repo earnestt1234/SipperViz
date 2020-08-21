@@ -716,7 +716,10 @@ class SipperViz(tk.Tk):
         self.makeplot_selectionframe.grid_rowconfigure(0, weight=1)
         self.makeplot_selection = ttk.Treeview(self.makeplot_selectionframe,
                                                height=12)
-        self.makeplot_selection.column('#0', width=230)
+        width = 230
+        if platform.system() == 'Darwin':
+            width = 260
+        self.makeplot_selection.column('#0', width=width)
         self.makeplot_selection.heading('#0', text='Plots')
         self.makeplot_drinks = self.makeplot_selection.insert('', 1, text='Drink Plots',
                                                               open=True)
@@ -1231,9 +1234,14 @@ class SipperViz(tk.Tk):
 
     #---bindings
         self.r_click = '<Button-3>'
+        if platform.system() == 'Darwin':
+            '<Button-2>'
         self.bind('<Escape>', self.escape)
         ctrla1 = '<Control-a>'
         ctrla2 = '<Control-A>'
+        if platform.system() == 'Darwin':
+            ctrla1 = '<Mod1-a>'
+            ctrla2 = '<Mod1-A>'
         self.bind(ctrla1, self.select_all)
         self.bind(ctrla2, self.select_all)
 
