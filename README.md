@@ -2,6 +2,7 @@
 <p align="center">
 	<img src="img/sipperviz_mouse_logo.png" width="500">
 </p>
+
 **Sippers** are 3D-printed, open-source devices for measuring liquid ingestion in rodents.  Sippers were developed in the [Creed](https://www.creedlab.org/) and [Kravitz](https://kravitzlab.com/) Labs at Washington University.  You can visit [hackaday](https://hackaday.io/project/160388-automated-mouse-homecage-two-bottle-choice-test-v2) to learn how to build Sippers, and see [this publication](https://doi.org/10.1523/ENEURO.0292-19.2019) for a description of their use
 
 **SipperViz** is a Python GUI for graphing data produced by Sippers.  SipperViz can be used to:
