@@ -1,0 +1,159 @@
+# Installing SipperViz
+
+There are currently two methods for running SipperViz: either **downloading the application** or **running the Python script**.
+
+The application (created with [PyInstaller](https://www.pyinstaller.org/)) tries to function like any other computer GUI: just double-click to start.  This method of installation is intended for people who don't have Python installed or don't want to mess around with any code.  Currently, there are 64-bit Windows and Mac OS X options.
+
+The more universal option is running the Python script in your own interpreter.  This option will involve some futzing with a terminal, but I've done my best to provide detailed instructions below.
+
+If you have any issues with either of the installation methods, please post your issue [here](https://github.com/earnestt1234/SipperViz/issues).  The process of converting the Python script to an application is a black box to me, so I cannot promise that issues with running the `.exe` will be solvable.  Running the Python script will hopefully be less error-prone, and I will aim to prioritize getting that method functioning for everyone.
+
+## Method 1: Running SipperViz from an .exe
+
+### Windows:
+
+System Requirements:
+
+- Windows (64-bit)
+- built on Windows 10, though not sure if that is required
+
+Instructions:
+
+1. Visit the [releases page](https://github.com/earnestt1234/FED3_Viz/releases)
+
+2. From the most recent version, download the`sipperviz-win64.zip` (under "Assets") and unzip.
+
+3. (Optional) Add a Windows Defender exclusion for the `sipperviz` folder (in the unzipped folder), following [these instruction from Microsoft](https://support.microsoft.com/en-us/help/4028485/windows-10-add-an-exclusion-to-windows-security).  
+
+   Explanation: SipperViz may be very slow to open (~1 min) when first starting if Windows antivirus has to scan it;  [you can see this thread for a discussion of the issue](http://pyinstaller.47505.x6.nabble.com/very-slow-start-td2089.html).  Adding the exclusion seems to fix the issue, and I have not found a way around that isn't significantly more complicated or expensive.  If you do add the exclusion, **you should not add any other foreign files to the `sipperviz` folder**.  You will also need to redo the exclusion if the folder moves.  If you do not want to add the exclusion, you can expect the first start of SipperViz to be slow each use, but following starts to be quicker.
+
+4. In the unzipped folder, navigate to `sipperviz/sipperviz.exe`.
+
+5. (Optional) Right-click > Create shortcut and place the shortcut in a less nasty folder.*  There are `.ico` files which can be used to replace the shortcut icon in the `img` folder.
+
+6. Double click the `.exe` or the shortcut to run - you may have to permit Windows security to let the application run (from an unknown developer).  Startup is sometimes slow on the first use but gets better.
+
+### Mac:
+
+System Requirements:
+
+- Mac OS X
+- built on Yosemite v10.10.5, but I have tested on a machine with Catalina
+
+Instructions:
+
+1. Visit the [releases page](https://github.com/earnestt1234/FED3_Viz/releases)
+
+2. From the most recent version, download the `sipperviz-osx.zip` (under "Assets") and unzip.
+
+3. In the unzipped folder, navigate to `sipperviz/sipperviz` (the UNIX executable file)
+
+4. (Optional) Right-click > Make Alias and place the shortcut in a less nasty folder.*  There are `.ico` files which can be used to replace the shortcut icon in the `img` folder.
+
+5. Double click `sipperviz` or the shortcut to run - you may have to permit Mac security to let the application run (from an unknown developer).  Startup is sometimes slow on the first use but gets better.
+
+   
+
+*_I haven't figured out how to bundle the zip folder with a working relative shortcut..._
+
+
+
+## Method 2: Running SipperViz from a Python interpreter
+
+These are the things you need to run SipperViz as a script:
+
+- the FED3 Viz source files
+- Python 3 
+- some third party Python packages
+
+These instructions will assume you have none of these.   
+
+If you already have Python installed, you only need to ensure that you have installed the third-party packages used by SipperViz (**Step 3** below).
+
+#### Step 1: Download SipperViz source files
+
+Visit the [releases page](https://github.com/earnestt1234/FED3_Viz/releases), and download the latest `Source code (zip)` file.  Unzip the files on your computer (doesn't matter where).
+
+#### Step 2: Install Python​ :snake:
+
+Python can be installed in multiple ways.  These instructions will follow the Anaconda Distribution, and will refer to some of its specific features.
+
+Visit the [Anaconda download page](https://www.anaconda.com/distribution/) and download/install the **Python 3** (e.g. 3.7) version that matches your OS.  Anaconda will install the Python language, a place to run code, and lots of helpful packages (some used by SipperViz).
+
+#### Step 3: Install requirements with a virtual environment (recommended*)
+
+SipperViz was built in Python 3.8.3, with specific versions of some 3rd party packages (like `pandas`, `matplotlib`, etc.).  It is possible that changes to any of these libraries may alter or disrupt SipperViz's functionality in the future.  To get around that issue, you can create a *virtual environment*; a segmented version of Python on your PC where specific versions of packages can be installed.  These instructions will describe how to do so in Anaconda (but this is [doable without Anaconda](https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/)).
+
+To make a virtual environment with Anaconda (a la [these instructions](https://docs.anaconda.com/anaconda/user-guide/tasks/switch-environment/)), open Anaconda Prompt on Windows, or on Mac you can just use Terminal (for the latter if you find you can't use `conda` commands, you may have to do some [additional setup](https://towardsdatascience.com/how-to-successfully-install-anaconda-on-a-mac-and-actually-get-it-to-work-53ce18025f97)).  Run the following command, where sipperviz is the name you give the new environment:
+
+```
+conda create --name sipperviz python=3.7
+```
+
+Once finished, "activate" the environment by running (on Windows):
+
+```
+activate sipperviz
+```
+
+Or on Mac/Linux:
+
+```
+conda activate sipperviz
+```
+
+You should see the command line change to start with `(sipperviz)`.  
+
+Now, you can install SipperViz's dependencies in this `sipperviz` environment using Python's `pip` package manager.  These dependencies can be installed in one go by using the `requirements.txt` file, available inside the main `FED3_Viz` folder of the downloaded source code.  
+
+In Anaconda Prompt, navigate to the directory of `requirements.txt`, using `cd`, e.g.:
+
+```
+cd C:/Users/earne/Downloads/SipperViz
+```
+
+This will look slightly different depending on your OS.  If you are in the correct directory, you can then call the following command to install the required packages:
+
+```
+pip install -r requirements.txt
+```
+
+This may take a few minutes.  
+
+***Note that you don't *have* to create a virtual environment** - you can do the `pip` install in your global Python installation as well.  However, this may cause issues if you have other scripts with different dependencies.  You also may need to uninstall and reinstall some packages if you want to match the versions in `requirements.txt` exactly.
+
+#### Step 4: Run the SipperViz script
+
+You are now ready to run SipperViz!  The script which generates the application is `sipperviz.py`.  You can run this script from Anaconda Prompt by moving into the `SipperViz` folder and calling:
+
+```
+python sipperviz.py
+```
+
+You can also run the script in any other Python terminal or IDE, but you may have to take extra steps to point to the `sipperviz` virtual environment.
+
+In my hands, there are a few guidelines which, if not met, may result in errors:
+
+- The script is being run in the virtual environment with the dependencies installed
+- the current working directory of the interpreter running the script is the same of `sipperviz.py`
+- the files and organization of folders within `SipperViz/` have not been moved or altered (with the exception of saved settings, sessions, or group labels in the `settings/`, `groups/`, or  `sessions/` directories.)
+
+Note that if you want to close the environment and return to the global installation of Python, you can call (on Windows):
+
+```
+deactivate
+```
+
+Or on Mac/Linux:
+
+```
+conda deactivate
+```
+
+##### Note for Mac/Linux Users:
+
+SipperViz was developed on Windows, which may cause issues when running on another system.
+
+When running on **Mac**, I noticed some cosmetic differences in SipperViz (due to differences in the system's default widgets); I have been able to make quick fixes for these.  Most of these issues seem to disappear when using the executable, curiously.  Running from the Python script still works (so far I can tell), but there may be some ugly looking buttons and wonky coloring.  I haven't detected any Mac specific functionality issues yet.
+
+I will not be able to test the script on **Linux** , or make any kind of application for Linux.  If anyone does end up using this on Linux, I'd be curious to see how it works.
