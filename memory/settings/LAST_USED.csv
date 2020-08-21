@@ -9,15 +9,15 @@ dfilter_edate,2020-08-21
 dfilter_shour,noon
 dfilter_ehour,noon
 shade_dark,True
-show_left,True
-show_right,True
+show_left,False
+show_right,False
 show_content_val,True
 binsize,1 hour
 kde,True
 logx,True
 combine,True
-circ_left,True
-circ_right,True
+circ_left,False
+circ_right,False
 circ_content,True
 circ_show_indvl,False
 circ_var,SEM

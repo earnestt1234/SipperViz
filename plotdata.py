@@ -479,6 +479,8 @@ def content_preference(sipper, pref_content=[], pref_metric='Count', pref_bins='
     base = df.index[0].hour
     for i, c in enumerate(pref_content):
         target = sipper.get_content_values(c, out=pref_metric, df=df)
+        if target.empty:
+            continue
         target = target.diff().resample(pref_bins, base=base).sum()
         other  = sipper.get_content_values(c, out=pref_metric, df=df,
                                            opposite=True)
@@ -515,7 +517,8 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
                         key = '{} - {}'.format(group, c)
                         vals = sipper.get_content_values(c, out='Count',
                                                          df=df).diff()
-                        to_plot[key].append(vals.rename(sipper.basename))
+                        if not vals.empty:
+                            to_plot[key].append(vals.rename(sipper.basename))
     for i, (label, data) in enumerate(to_plot.items()):
         temp = pd.DataFrame()
         processed = preproc_averaging(data, averaging=averaging,
@@ -560,7 +563,8 @@ def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
                         key = '{} - {}'.format(group, c)
                         vals = sipper.get_content_values(c, out='Duration',
                                                          df=df).diff()
-                        to_plot[key].append(vals.rename(sipper.basename))
+                        if not vals.empty:
+                            to_plot[key].append(vals.rename(sipper.basename))
     for i, (label, data) in enumerate(to_plot.items()):
         temp = pd.DataFrame()
         processed = preproc_averaging(data, averaging=averaging,
