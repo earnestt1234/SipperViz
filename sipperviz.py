@@ -718,7 +718,7 @@ class SipperViz(tk.Tk):
                                                height=12)
         width = 230
         if platform.system() == 'Darwin':
-            width = 260
+            width = 300
         self.makeplot_selection.column('#0', width=width)
         self.makeplot_selection.heading('#0', text='Plots')
         self.makeplot_drinks = self.makeplot_selection.insert('', 1, text='Drink Plots',
@@ -1235,7 +1235,7 @@ class SipperViz(tk.Tk):
     #---bindings
         self.r_click = '<Button-3>'
         if platform.system() == 'Darwin':
-            '<Button-2>'
+            self.r_click = '<Button-2>'
         self.bind('<Escape>', self.escape)
         ctrla1 = '<Control-a>'
         ctrla2 = '<Control-A>'
@@ -2856,7 +2856,7 @@ class SipperViz(tk.Tk):
             os.startfile(s.path)
         except:
             opener = 'open' if sys.platform == 'darwin' else 'xdg-open'
-            subprocess.call([opener, s.directory])
+            subprocess.call([opener, s.path])
 
 plt.style.use('seaborn-whitegrid')
 root = SipperViz()
