@@ -58,30 +58,45 @@ for p in os.listdir(direc):
 
 
     #%%
-# Try to import Python 2 name
-try:
-    import Tkinter as tk
-# Fall back to Python 3 if import fails
-except ImportError:
-    import tkinter as tk
 
-class Example(tk.Frame):
-    def __init__(self, root):
-        tk.Frame.__init__(self, root)
-        menubar = tk.Menu(self)
-        fileMenu = tk.Menu(self)
-        recentMenu = tk.Menu(self)
-
-        menubar.add_cascade(label="File", menu=fileMenu)
-        fileMenu.add_cascade(label="Open Recent", menu=recentMenu)
-        for name in ("file1.txt", "file2.txt", "file3.txt"):
-            recentMenu.add_command(label=name)
-
-
-        root.configure(menu=menubar)
-        root.geometry("200x200")
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    Example(root).pack(fill="both", expand=True)
-    root.mainloop()
+def drinkcount_cumulative(sipper, show_left=True, show_right=True,
+                          show_content=[], shade_dark=True,
+                          lights_on=7, lights_off=19, **kwargs):
+    if 'ax' in kwargs:
+        ax = kwargs['ax']
+    else:
+        fig, ax = plt.subplots()
+    df = sipper.data
+    if 'date_filter' in kwargs:
+        s, e = kwargs['date_filter']
+        df = df[(df.index >= s) &
+                (df.index <= e)].copy()
+    if show_left:
+        ax.plot(df.index, df['LeftCount'], drawstyle='steps', color='red',
+                label=sipper.left_name)
+    if show_right:
+        ax.plot(df.index, df['RightCount'], drawstyle='steps', color='blue',
+                label=sipper.right_name)
+    content_max = df.index.min()
+    content_min = df.index.max()
+    if show_content:
+        for c in show_content:
+            count = sipper.get_content_values(c, out='Count', df=df)
+            if not count.empty:
+                ax.plot(count.index, count, drawstyle='steps', label=c)
+                if count.index.max() > content_max:
+                    content_max = count.index.max()
+                if count.index.min() < content_min:
+                    content_min = count.index.min()
+    if any((show_right, show_left)):
+        date_format_x(ax, df.index[0], df.index[-1])
+    else:
+        date_format_x(ax, content_min, content_max)
+    ax.set_title('Drink Count for ' + sipper.filename)
+    ax.set_ylabel('Total Drinks')
+    ax.set_xlabel('Date')
+    if shade_dark:
+        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
