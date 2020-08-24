@@ -1573,6 +1573,8 @@ class SipperViz(tk.Tk):
                                                 data=obj.data,)
             jarred['plots'] = jarred_plots
             jarred['settings'] = self.get_settings_df()
+            jarred['selected_content'] = self.contentselect.selection()
+            jarred['selected_groups'] = self.groupselect.selection()
             pickle.dump(jarred, open(savepath, 'wb'))
 
     def load_session(self):
@@ -1591,8 +1593,20 @@ class SipperViz(tk.Tk):
             for plot in self.loaded_plots:
                 self.loaded_plots[plot].args['ax'] = self.ax
                 self.display_plot(self.loaded_plots[plot], insert=True)
+            self.load_settings_df(from_df=unjarred['settings'])
             self.update_all_buttons()
-            # self.load_settings(dialog=False, from_df=unjarred['settings'])
+            self.contentselect.selection_remove(*self.contentselect.selection())
+            for c in unjarred['selected_content']:
+                if c in self.contentselect.get_children():
+                    self.contentselect.selection_add(c)
+            self.groupselect.selection_remove(*self.groupselect.selection())
+            for g in unjarred['selected_groups']:
+                if g in self.groupselect.get_children():
+                    self.groupselect.selection_add(g)
+            self.update_all_buttons()
+
+
+
 
     #---info pane functions
     def display_details(self, *event):
