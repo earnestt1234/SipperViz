@@ -1,0 +1,1 @@
+pyinstaller --add-data "img:img" --add-data "memory:memory" --add-data "memory:memory" --add-data "sipper.py:." --add-data "sipperplots.py:." --add-data "sipperinspect.py:." --add-data "plotdata.py:." sipperviz.py
