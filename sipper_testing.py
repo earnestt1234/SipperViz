@@ -100,3 +100,9 @@ def drinkcount_cumulative(sipper, show_left=True, show_right=True,
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
+
+#%%
+c_path = r"C:\Users\earne\Desktop\Concatted.csv"
+c = sipper.Sipper(c_path)
+c.unduplicate_index()
+d = c.data

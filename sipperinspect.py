@@ -152,6 +152,8 @@ def generate_code(sipper_plot):
             if sipper_plot.content_dicts[s]:
                 d = sipper_plot.content_dicts[s]
                 output += arg + '.assign_contents({})\n'.format(d)
+            if s.unduplicated:
+                output += arg + '.unduplicate_index()\n'
         elif arg == 'sippers':
             sipper_list = []
             for i, s in enumerate(used_args[arg]):
@@ -162,6 +164,8 @@ def generate_code(sipper_plot):
                 if sipper_plot.content_dicts[s]:
                     d = sipper_plot.content_dicts[s]
                     output += variable + '.assign_contents({})\n'.format(d)
+                if s.unduplicated:
+                    output += variable + '.unduplicate_index()\n'
             var_list = '\nsippers = ' + '[%s]' % ', '.join(map(str, sipper_list)) + '\n'
             output += var_list
         elif arg == 'groups':
