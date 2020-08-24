@@ -1605,9 +1605,6 @@ class SipperViz(tk.Tk):
                     self.groupselect.selection_add(g)
             self.update_all_buttons()
 
-
-
-
     #---info pane functions
     def display_details(self, *event):
         self.info_view.delete(*self.info_view.get_children())
@@ -2560,7 +2557,7 @@ class SipperViz(tk.Tk):
         s, e = self.get_content_dates()
         values = [s, e, self.lcontent_val.get(), self.rcontent_val.get()]
         allvals = self.assign_content_view.get_children()
-        self.assign_content_view.insert('', 'end', len(allvals), values=values)
+        self.assign_content_view.insert('', 'end', values=values)
         self.update_content_buttons()
 
     def delete_content(self):
