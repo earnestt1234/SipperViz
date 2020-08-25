@@ -19,7 +19,7 @@ System Requirements:
 
 Instructions:
 
-1. Visit the [releases page](https://github.com/earnestt1234/FED3_Viz/releases)
+1. Visit the [releases page](https://github.com/earnestt1234/SipperViz/releases)
 
 2. From the most recent version, download the`sipperviz-win64.zip` (under "Assets") and unzip.
 
@@ -42,7 +42,7 @@ System Requirements:
 
 Instructions:
 
-1. Visit the [releases page](https://github.com/earnestt1234/FED3_Viz/releases)
+1. Visit the [releases page](https://github.com/earnestt1234/SipperViz/releases)
 
 2. From the most recent version, download the `sipperviz-osx.zip` (under "Assets") and unzip.
 
@@ -62,7 +62,7 @@ Instructions:
 
 These are the things you need to run SipperViz as a script:
 
-- the FED3 Viz source files
+- the SipperViz source files
 - Python 3 
 - some third party Python packages
 
@@ -72,7 +72,7 @@ If you already have Python installed, you only need to ensure that you have inst
 
 #### Step 1: Download SipperViz source files
 
-Visit the [releases page](https://github.com/earnestt1234/FED3_Viz/releases), and download the latest `Source code (zip)` file.  Unzip the files on your computer (doesn't matter where).
+Visit the [releases page](https://github.com/earnestt1234/SipperViz/releases), and download the latest `Source code (zip)` file.  Unzip the files on your computer (doesn't matter where).
 
 #### Step 2: Install Python​ :snake:
 
@@ -104,7 +104,7 @@ conda activate sipperviz
 
 You should see the command line change to start with `(sipperviz)`.  
 
-Now, you can install SipperViz's dependencies in this `sipperviz` environment using Python's `pip` package manager.  These dependencies can be installed in one go by using the `requirements.txt` file, available inside the main `FED3_Viz` folder of the downloaded source code.  
+Now, you can install SipperViz's dependencies in this `sipperviz` environment using Python's `pip` package manager.  These dependencies can be installed in one go by using the `requirements.txt` file, available inside the main `SipperViz` folder of the downloaded source code.  
 
 In Anaconda Prompt, navigate to the directory of `requirements.txt`, using `cd`, e.g.:
 
