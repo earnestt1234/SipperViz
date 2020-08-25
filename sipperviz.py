@@ -1361,6 +1361,8 @@ class SipperViz(tk.Tk):
                 self.update()
                 if self.load_dups_val.get() and os.path.basename(file) in loaded_filenames:
                     continue
+                if not os.path.isfile(file):
+                    continue
                 if self.loading:
                     try:
                         s = sipper.Sipper(file)
@@ -2754,8 +2756,9 @@ class SipperViz(tk.Tk):
             warn_window.iconbitmap(self.exepath('img/exclam.ico'))
         warn_window.grab_set()
         warn_window.title('Loading Errors')
-        text = ("The files listed below have a duplicated date index: "
-                'some dates appear more than once.')
+        text = ("The following files were not loaded.  "
+                "They likely either are not XLSX/CSV, are not Sipper data, or "
+                "have been edited and are not recognized.")
         for s in self.failed_to_load:
             text += '\n  - ' + s
         warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
