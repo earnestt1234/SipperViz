@@ -148,6 +148,9 @@ class Sipper():
         self.groups = []
         self.sipperviz_assigned = False
         # ^ extra steps for plot code must be added if True
+        self.duplicate_index = any(self.data.index.duplicated())
+        self.unduplicated = False
+        # ^ flag to show whether removal of duplicates has been done
 
     def __repr__(self):
         """Shows the directory used to make the file."""
@@ -218,3 +221,14 @@ class Sipper():
         df['RightContents'] = np.nan
         self.contents = []
         self.contents_dict = {}
+
+    def unduplicate_index(self, method='keeplast'):
+        if method=='keeplast':
+            self.data = self.data[~self.data.index.duplicated(keep='last')]
+        elif method=='fromelapsed':
+            if any(self.data['Elapsed Time'].diff() < pd.Timedelta(0)):
+                raise SipperError('Elapsed Times are not always increasing')
+            t0 = self.data.index[0] - pd.Timedelta(seconds=10)
+            self.data.index = self.data['Elapsed Time'] + t0
+        self.unduplicated = True
+        self.duplicate_index = False

@@ -64,7 +64,9 @@ class SipperViz(tk.Tk):
                                 'Duration':'duration', 'Device': 'device_no',
                                 'Left Sipper Name':'left_name',
                                 'Right Sipper Name':'right_name',
-                                'Version': 'version', }
+                                'Version': 'version',
+                                'Duplicate Index':'duplicate_index'}
+
         self.file_info_names = list(self.attr_conversion.keys())
 
         #way to covert times to integers
@@ -568,6 +570,12 @@ class SipperViz(tk.Tk):
                                              text="Don't load files whose file names are already present in SipperViz.",
                                              var=self.load_dups_val)
 
+        self.warn_dupindex_val = tk.BooleanVar()
+        self.warn_dupindex_val.set(True)
+        self.warn_dupindex_box = ttk.Checkbutton(self.general_settings,
+                                                 text="Show duplicate index warning when loading",
+                                                 var=self.warn_dupindex_val)
+
         self.save_settings_button  = tk.Button(self.general_settings,
                                                text='Save Settings',
                                                command=self.save_settings_dialog)
@@ -584,8 +592,10 @@ class SipperViz(tk.Tk):
                                     columnspan=2)
         self.load_dups_box.grid(row=3, column=0, sticky='nsew', padx=20, pady=5,
                                 columnspan=2)
-        self.save_settings_button.grid(row=4, column=0, sticky='nsew', padx=20, pady=5)
-        self.load_settings_button.grid(row=4, column=1, sticky='nsew', padx=20, pady=5)
+        self.warn_dupindex_box.grid(row=4, column=0, sticky='nsew', padx=20, pady=5,
+                                    columnspan=2)
+        self.save_settings_button.grid(row=5, column=0, sticky='nsew', padx=20, pady=5)
+        self.load_settings_button.grid(row=5, column=1, sticky='nsew', padx=20, pady=5)
 
     #---create assign contents window
         self.contents_window = tk.Toplevel(self)
@@ -951,6 +961,7 @@ class SipperViz(tk.Tk):
         self.sippermenu.add_command(label='Show/edit file contents',
                                     command=self.raise_content_window_for_file)
         self.sippermenu.add_command(label='Clear contents', command=self.clear_contents)
+        self.sippermenu.add_command(label='Remove duplicate dates', command=self.remove_dup_dates)
         self.sippermenu.add_separator()
         self.sippermenu.add_command(label='Manage Groups', command=self.raise_group_window)
         self.sippermenu.add_command(label='Create Group and add files',
@@ -1331,6 +1342,7 @@ class SipperViz(tk.Tk):
     def load_files(self, from_folder=False):
         loaded_filenames = [s.basename for s in self.loaded_sippers]
         self.failed_to_load = []
+        self.duplicate_index_files = []
         files = None
         if from_folder:
             folder = tk.filedialog.askdirectory(title='Load folder of files')
@@ -1351,7 +1363,10 @@ class SipperViz(tk.Tk):
                     continue
                 if self.loading:
                     try:
-                        self.loaded_sippers.append(sipper.Sipper(file))
+                        s = sipper.Sipper(file)
+                        self.loaded_sippers.append(s)
+                        if s.duplicate_index:
+                            self.duplicate_index_files.append(s.basename)
                     except:
                         self.failed_to_load.append(file)
                         tb = traceback.format_exc()
@@ -1364,6 +1379,8 @@ class SipperViz(tk.Tk):
             self.loading = False
             if self.failed_to_load:
                 self.raise_load_error()
+            if self.duplicate_index_files and self.warn_dupindex_val.get():
+                self.raise_dup_index_error()
 
     def delete_files(self):
         selected = [int(i) for i in self.file_view.selection()]
@@ -1512,6 +1529,12 @@ class SipperViz(tk.Tk):
             self.loaded_sippers = self.loaded_sippers[::-1]
             self.update_file_view(select=selected)
 
+    def remove_dup_dates(self):
+        selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
+        for s in selected:
+            s.unduplicate_index()
+        self.update_all_buttons()
+
     def exepath(self, relative):
         try:
             imgpath = os.path.join(os.path.dirname(sys.executable), relative)
@@ -1550,6 +1573,8 @@ class SipperViz(tk.Tk):
                                                 data=obj.data,)
             jarred['plots'] = jarred_plots
             jarred['settings'] = self.get_settings_df()
+            jarred['selected_content'] = self.contentselect.selection()
+            jarred['selected_groups'] = self.groupselect.selection()
             pickle.dump(jarred, open(savepath, 'wb'))
 
     def load_session(self):
@@ -1568,8 +1593,17 @@ class SipperViz(tk.Tk):
             for plot in self.loaded_plots:
                 self.loaded_plots[plot].args['ax'] = self.ax
                 self.display_plot(self.loaded_plots[plot], insert=True)
+            self.load_settings_df(from_df=unjarred['settings'])
             self.update_all_buttons()
-            # self.load_settings(dialog=False, from_df=unjarred['settings'])
+            self.contentselect.selection_remove(*self.contentselect.selection())
+            for c in unjarred['selected_content']:
+                if c in self.contentselect.get_children():
+                    self.contentselect.selection_add(c)
+            self.groupselect.selection_remove(*self.groupselect.selection())
+            for g in unjarred['selected_groups']:
+                if g in self.groupselect.get_children():
+                    self.groupselect.selection_add(g)
+            self.update_all_buttons()
 
     #---info pane functions
     def display_details(self, *event):
@@ -2256,6 +2290,7 @@ class SipperViz(tk.Tk):
                              lights_off      =self.lightsoff_menu.get(),
                              groupload_abs   =self.groupload_abs_val.get(),
                              load_dups       =self.load_dups_val.get(),
+                             warn_dupindex   =self.warn_dupindex_val.get(),
                              dfilter_val     =self.date_filter_val.get(),
                              dfilter_sdate   =self.dfilter_s_date.get_date(),
                              dfilter_edate   =self.dfilter_e_date.get_date(),
@@ -2361,6 +2396,7 @@ class SipperViz(tk.Tk):
         self.lightsoff_menu.set(df.loc['lights_off', v])
         self.groupload_abs_val.set(df.loc['groupload_abs', v])
         self.load_dups_val.set(df.loc['load_dups', v])
+        self.warn_dupindex_val.set(df.loc['warn_dupindex', v])
         self.drink_showleft_val.set(df.loc['show_left', v])
         self.drink_showright_val.set(df.loc['show_right', v])
         self.drink_showcontent_val.set(df.loc['show_content_val', v])
@@ -2521,7 +2557,7 @@ class SipperViz(tk.Tk):
         s, e = self.get_content_dates()
         values = [s, e, self.lcontent_val.get(), self.rcontent_val.get()]
         allvals = self.assign_content_view.get_children()
-        self.assign_content_view.insert('', 'end', len(allvals), values=values)
+        self.assign_content_view.insert('', 'end', values=values)
         self.update_content_buttons()
 
     def delete_content(self):
@@ -2552,8 +2588,12 @@ class SipperViz(tk.Tk):
         files = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
         if files:
             for f in files:
-                f.assign_contents(d)
-                f.sipperviz_assigned = True
+                try:
+                    f.assign_contents(d)
+                    f.sipperviz_assigned = True
+                except:
+                    self.raise_cant_assign(f)
+                    return
         self.close_content_window()
         self.display_details()
         self.update_avail_contents()
@@ -2654,12 +2694,14 @@ class SipperViz(tk.Tk):
             m.entryconfig(self.get_menu_index(m, 'Assign contents'), state='normal')
             m.entryconfig(self.get_menu_index(m, 'Show/edit file contents'), state='normal')
             m.entryconfig(self.get_menu_index(m, 'Clear contents'), state='normal')
+            m.entryconfig(self.get_menu_index(m, 'Remove duplicate dates'), state='normal')
             m.entryconfig(self.get_menu_index(m, 'Concatenate'), state='normal')
             m.entryconfig(self.get_menu_index(m, 'Create Group and add files'), state='normal')
         else:
             m.entryconfig(self.get_menu_index(m, 'Rename tubes'), state='disabled')
             m.entryconfig(self.get_menu_index(m, 'Assign contents'), state='disabled')
             m.entryconfig(self.get_menu_index(m, 'Show/edit file contents'), state='disabled')
+            m.entryconfig(self.get_menu_index(m, 'Remove duplicate dates'), state='disabled')
             m.entryconfig(self.get_menu_index(m, 'Clear contents'), state='disabled')
             m.entryconfig(self.get_menu_index(m, 'Concatenate'), state='disabled')
             m.entryconfig(self.get_menu_index(m, 'Create Group and add files'), state='disabled')
@@ -2712,14 +2754,40 @@ class SipperViz(tk.Tk):
             warn_window.iconbitmap(self.exepath('img/exclam.ico'))
         warn_window.grab_set()
         warn_window.title('Loading Errors')
-        # if not platform.system() == 'Darwin':
-        #     warn_window.iconbitmap('img/exclam.ico')
-        text = ("The following files could not be loaded.\n" +
-                '\nThey were likely either not CSV/XLSX, not Sipper data, or were empty:\n')
+        text = ("The files listed below have a duplicated date index: "
+                'some dates appear more than once.')
         for s in self.failed_to_load:
             text += '\n  - ' + s
         warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
         warning.pack(padx=(20,20),pady=(20,20))
+
+    def raise_dup_index_error(self):
+        warn_window = tk.Toplevel(self)
+        if not platform.system() == 'Darwin':
+            warn_window.iconbitmap(self.exepath('img/exclam.ico'))
+        warn_window.grab_set()
+        warn_window.title('Duplicate Index Warning')
+        text = ('The files listed below have a duplicate date index - '
+                'some timestamps appear more than once.  '
+                'This can break some functions in SipperViz, '
+                'particularly assigning contents.\n\n'
+                'A typical cause of this issue stems from Excel, '
+                'which truncates seconds from timestamps of CSV files '
+                'when saving them (see link to issue on Stack Overflow).  '
+                'If you have access to raw, unedited data, '
+                'you switch to using those.  Otherwise, you can remove '
+                'duplicate indices (keeping only the last occurence of '
+                'each duplicate) under Sippers > Remove duplicate dates.\n\n'
+                'You can suppress this warning from the General Settings menu.\n')
+        for s in self.duplicate_index_files:
+            text += '\n  - ' + s
+        warning = tk.Label(warn_window, text=text, justify=tk.LEFT,
+                           wraplength=300)
+        url = 'https://stackoverflow.com/q/62665687/13386979'
+        stack_button = tk.Button(warn_window, text='see Stack Overflow',
+                                 command = lambda : self.open_url(url))
+        warning.pack(padx=(20,20),pady=(20,20))
+        stack_button.pack(padx=20, pady=20, side='bottom')
 
     def raise_dfilter_error(self):
         warn_window = tk.Toplevel(self)
@@ -2727,8 +2795,6 @@ class SipperViz(tk.Tk):
             warn_window.iconbitmap(self.exepath('img/exclam.ico'))
         warn_window.grab_set()
         warn_window.title('Date Filter Errors')
-        # if not platform.system() == 'Darwin':
-        #     warn_window.iconbitmap('img/exclam.ico')
         text = ("The following files did not have any data within the date filter" +
                 '\nPlease edit or remove the global date filter to plot them:\n')
         for s in self.bad_date_sippers:
@@ -2779,14 +2845,22 @@ class SipperViz(tk.Tk):
         warn_window = tk.Toplevel(self)
         warn_window.grab_set()
         warn_window.title('Replotting Errors')
-        # if not platform.system() == 'Darwin':
-        #     warn_window.iconbitmap('img/exclam.ico')
         text = ("The following plots could not be replotted.\n"
                 '\nEither their files have been removed, or they use Groups and none are selected:\n')
         for s in self.failed_replot:
             text += '\n  - ' + s
         warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
         warning.pack(padx=(20,20),pady=(20,20))
+
+    def raise_cant_assign(self, sipper):
+            warn_window = tk.Toplevel(self)
+            warn_window.grab_set()
+            warn_window.title('Content Assingment Error')
+            text = ("Coudn't assign contents to {}.\n\n".format(sipper.basename))
+            if sipper.duplicate_index:
+                text += "This file as a duplicate index, which might be causing the issue."
+            warning = tk.Label(warn_window, text=text, justify=tk.LEFT)
+            warning.pack(padx=(20,20),pady=(20,20))
 
     #---run before closing:
     def on_close(self):

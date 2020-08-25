@@ -470,17 +470,29 @@ def drinkcount_cumulative(sipper, show_left=True, show_right=True,
     if show_right:
         ax.plot(df.index, df['RightCount'], drawstyle='steps', color='blue',
                 label=sipper.right_name)
+    content_max = df.index.min()
+    content_min = df.index.max()
     if show_content:
         for c in show_content:
             count = sipper.get_content_values(c, out='Count', df=df)
             if not count.empty:
                 ax.plot(count.index, count, drawstyle='steps', label=c)
-    date_format_x(ax, df.index[0], df.index[-1])
+                if count.index.max() > content_max:
+                    content_max = count.index.max()
+                if count.index.min() < content_min:
+                    content_min = count.index.min()
+    if show_content and all([not show_left, not show_right]):
+        dformat_min = content_min
+        dformat_max = content_max
+    else:
+        dformat_min = df.index[0]
+        dformat_max = df.index[-1]
+    date_format_x(ax, dformat_min, dformat_max)
     ax.set_title('Drink Count for ' + sipper.filename)
     ax.set_ylabel('Total Drinks')
     ax.set_xlabel('Date')
     if shade_dark:
-        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+        shade_darkness(ax, dformat_min, dformat_max, lights_on, lights_off)
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
@@ -506,18 +518,30 @@ def drinkcount_binned(sipper, binsize='1H', show_left=True, show_right=True,
         r = df['RightCount'].diff().resample(binsize, base=base).sum()
         ax.plot(r.index, r, color='blue',
                 label=sipper.right_name)
+    content_max = df.index.min()
+    content_min = df.index.max()
     if show_content:
         for c in show_content:
             count = sipper.get_content_values(c, out='Count', df=df)
             binned = count.diff().resample(binsize, base=base).sum()
             if not count.empty:
                 ax.plot(binned.index, binned, label=c)
-    date_format_x(ax, df.index[0], df.index[-1])
+                if count.index.max() > content_max:
+                        content_max = count.index.max()
+                if count.index.min() < content_min:
+                    content_min = count.index.min()
+    if show_content and all([not show_left, not show_right]):
+        dformat_min = content_min
+        dformat_max = content_max
+    else:
+        dformat_min = df.index[0]
+        dformat_max = df.index[-1]
+    date_format_x(ax, dformat_min, dformat_max)
     ax.set_title('Drink Count for ' + sipper.filename)
     ax.set_ylabel('Drinks')
     ax.set_xlabel('Date')
     if shade_dark:
-        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+        shade_darkness(ax, dformat_min, dformat_max, lights_on, lights_off)
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
@@ -540,17 +564,29 @@ def drinkduration_cumulative(sipper, show_left=True, show_right=True,
     if show_right:
         ax.plot(df.index, df['RightDuration'], drawstyle='steps', color='blue',
                 label=sipper.right_name)
+    content_max = df.index.min()
+    content_min = df.index.max()
     if show_content:
         for c in show_content:
             count = sipper.get_content_values(c, out='Count', df=df)
             if not count.empty:
                 ax.plot(count.index, count, drawstyle='steps', label=c)
-    date_format_x(ax, df.index[0], df.index[-1])
+                if count.index.max() > content_max:
+                        content_max = count.index.max()
+                if count.index.min() < content_min:
+                    content_min = count.index.min()
+    if show_content and all([not show_left, not show_right]):
+        dformat_min = content_min
+        dformat_max = content_max
+    else:
+        dformat_min = df.index[0]
+        dformat_max = df.index[-1]
+    date_format_x(ax, dformat_min, dformat_max)
     ax.set_title('Drink Duration for ' + sipper.filename)
     ax.set_ylabel('Total Drink Duration (s)')
     ax.set_xlabel('Date')
     if shade_dark:
-        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+        shade_darkness(ax, dformat_min, dformat_max, lights_on, lights_off)
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
@@ -576,18 +612,30 @@ def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
         r = df['RightDuration'].diff().resample(binsize, base=base).sum()
         ax.plot(r.index, r, color='blue',
                 label=sipper.right_name)
+    content_max = df.index.min()
+    content_min = df.index.max()
     if show_content:
         for c in show_content:
             count = sipper.get_content_values(c, out='Duration', df=df)
             binned = count.diff().resample(binsize, base=base).sum()
             if not count.empty:
                 ax.plot(binned.index, binned, label=c)
-    date_format_x(ax, df.index[0], df.index[-1])
+                if count.index.max() > content_max:
+                        content_max = count.index.max()
+                if count.index.min() < content_min:
+                    content_min = count.index.min()
+    if show_content and all([not show_left, not show_right]):
+        dformat_min = content_min
+        dformat_max = content_max
+    else:
+        dformat_min = df.index[0]
+        dformat_max = df.index[-1]
+    date_format_x(ax, dformat_min, dformat_max)
     ax.set_title('Drink Duration for ' + sipper.filename)
     ax.set_ylabel('Drink Duration (s)')
     ax.set_xlabel('Date')
     if shade_dark:
-        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+        shade_darkness(ax, dformat_min, dformat_max, lights_on, lights_off)
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
@@ -966,6 +1014,8 @@ def content_preference(sipper, pref_content, pref_metric='Count', pref_bins='1H'
         df = df[(df.index >= s) &
                 (df.index <= e)].copy()
     base = df.index[0].hour
+    content_max = df.index.min()
+    content_min = df.index.max()
     for i, c in enumerate(pref_content):
         target = sipper.get_content_values(c, out=pref_metric, df=df)
         if target.empty:
@@ -976,16 +1026,26 @@ def content_preference(sipper, pref_content, pref_metric='Count', pref_bins='1H'
         other = other.diff().resample(pref_bins, base=base).sum()
         if not target.empty and not other.empty:
             preference = target / (target + other) * 100
+            if preference.dropna().index.max() > content_max:
+                    content_max = preference.dropna().index.max()
+            if preference.dropna().index.min() < content_min:
+                content_min = preference.dropna().index.min()
             ax.plot(preference.index, preference, color=colors[i],
                     label=c)
             ax.scatter(preference.index, preference, color=colors[i])
-    date_format_x(ax, df.index[0], df.index[-1])
+    if content_max > content_min:
+        dformat_min = content_min
+        dformat_max = content_max
+    else:
+        dformat_min = df.index[0]
+        dformat_max = df.index[-1]
+    date_format_x(ax, dformat_min, dformat_max)
     ax.set_title('Content Prefernce for ' + sipper.filename)
     label = 'Content Preference (% Drink {})'.format(pref_metric)
     ax.set_ylabel(label)
     ax.set_xlabel('Date')
     if shade_dark:
-        shade_darkness(ax, df.index[0], df.index[-1], lights_on, lights_off)
+        shade_darkness(ax, dformat_min, dformat_max, lights_on, lights_off)
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
