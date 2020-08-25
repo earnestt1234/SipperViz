@@ -19,7 +19,7 @@ Check out [FED3 Viz](https://github.com/earnestt1234/FED3_Viz) for a related pro
 
 ### Usage
 
-See the [releases page](https://github.com/earnestt1234/SipperViz/releases) to get the latest version of SipperViz.  The [`Installation.md`](https://github.com/earnestt1234/SipperViz/blob/master/Installation.md) file has instructions on how to run SipperViz as either an executable or a Python script.
+See the [releases page](https://github.com/earnestt1234/SipperViz/releases) to get the latest version of SipperViz.  There are [`Installation Instructions`](https://github.com/earnestt1234/SipperViz/blob/master/Installation.md) on how to run SipperViz as either an executable or a Python script.
 
 This work is licensed under a [Creative Commons Attribution 4.0 International
 License][cc-by].
