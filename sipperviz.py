@@ -398,17 +398,20 @@ class SipperViz(tk.Tk):
         self.drink_showleft_val.set(True)
         self.drink_showleft_box = ttk.Checkbutton(self.drink_settings,
                                                   variable=self.drink_showleft_val,
-                                                  text='Show left sipper')
+                                                  text='Show left sipper',
+                                                  command=self.update_all_buttons)
         self.drink_showright_val = tk.BooleanVar()
         self.drink_showright_val.set(True)
         self.drink_showright_box = ttk.Checkbutton(self.drink_settings,
                                                    variable=self.drink_showright_val,
-                                                   text='Show right sipper')
+                                                   text='Show right sipper',
+                                                   command=self.update_all_buttons)
         self.drink_showcontent_val = tk.BooleanVar()
         self.drink_showcontent_val.set(True)
         self.drink_showcontent_box = ttk.Checkbutton(self.drink_settings,
                                                      variable=self.drink_showcontent_val,
-                                                     text='Show contents (see Content tab)')
+                                                     text='Show contents (see Content tab)',
+                                                     command=self.update_all_buttons)
         self.drink_binsize_label = tk.Label(self.drink_settings,
                                             text='Bin size for binned plots')
         self.drink_binsize_menu = ttk.Combobox(self.drink_settings,
@@ -509,18 +512,21 @@ class SipperViz(tk.Tk):
         self.circ_showleft_val = tk.BooleanVar()
         self.circ_showleft_val.set(True)
         self.circ_showleft_box = ttk.Checkbutton(self.circ_settings,
-                                                  variable=self.circ_showleft_val,
-                                                  text='Show left sipper')
+                                                 variable=self.circ_showleft_val,
+                                                 text='Show left sipper',
+                                                 command=self.update_all_buttons)
         self.circ_showright_val = tk.BooleanVar()
         self.circ_showright_val.set(True)
         self.circ_showright_box = ttk.Checkbutton(self.circ_settings,
-                                                   variable=self.circ_showright_val,
-                                                   text='Show right sipper')
+                                                  variable=self.circ_showright_val,
+                                                  text='Show right sipper',
+                                                  command=self.update_all_buttons)
         self.circ_showcontent_val = tk.BooleanVar()
         self.circ_showcontent_val.set(True)
         self.circ_showcontent_box = ttk.Checkbutton(self.circ_settings,
-                                                     variable=self.circ_showcontent_val,
-                                                     text='Show contents (see Content tab)')
+                                                    variable=self.circ_showcontent_val,
+                                                    text='Show contents (see Content tab)',
+                                                    command=self.update_all_buttons)
         self.circ_showindvl_val = tk.BooleanVar()
         self.circ_showindvl_val.set(False)
         self.circ_showindvl_box = ttk.Checkbutton(self.circ_settings,
