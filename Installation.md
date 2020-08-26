@@ -31,7 +31,7 @@ Instructions:
 
 5. (Optional) Right-click > Create shortcut and place the shortcut in a less nasty folder.*  There are `.ico` files which can be used to replace the shortcut icon in the `img` folder.
 
-6. Double click the `.exe` or the shortcut to run - you may have to permit Windows security to let the application run (from an unknown developer).  Startup is sometimes slow on the first use but gets better.
+6. Double click the `.exe` or the shortcut to run - you may have to permit Windows security to let the application run (from an unknown developer).  Startup can be slow if you did not do Step 3.
 
 ### Mac:
 
@@ -50,8 +50,10 @@ Instructions:
 
 4. (Optional) Right-click > Make Alias and place the shortcut in a less nasty folder.*  There are `.ico` files which can be used to replace the shortcut icon in the `img` folder.
 
-5. Double click `sipperviz` or the shortcut to run - you may have to permit Mac security to let the application run (from an unknown developer).  Startup is sometimes slow on the first use but gets better.
+5. Double click `sipperviz` or the shortcut to run.
 
+   You may have to permit Mac security to let the application run (from an unknown developer).  This might be as easy hitting okay, or you might have to follow [this tutorial](https://www.imore.com/how-open-apps-anywhere-macos-catalina-and-mojave) to allow SipperViz to run.
+   
    
 
 *_I haven't figured out how to bundle the zip folder with a working relative shortcut..._
