@@ -52,9 +52,11 @@ Instructions:
 
 5. Double click `sipperviz` or the shortcut to run.
 
-   You may have to permit Mac security to let the application run (from an unknown developer).  This might be as easy hitting okay, or you might have to follow [this tutorial](https://www.imore.com/how-open-apps-anywhere-macos-catalina-and-mojave) to allow SipperViz to run.
+   You may have to permit Mac security to let the application run (from an unknown developer).  This can be slightly more complicated on Mac than Windows, especially with new versions.  You will likely need to follow one of 3 options (taken from [here](https://www.macworld.co.uk/how-to/mac-software/mac-app-unidentified-developer-3669596/)):
    
-   
+   - If a popup warns you but still allows you to open the program, you can do that
+   - Otherwise, you may have to go to System Preferences > Security and check the option for allowing applications from unidentified developers.  There may also be an option to start the program from this menu (as it knows that it was just blocked).
+   - If the option above is not available, you need to go to Terminal and enter `sudo spctl --master-disable` to unhide this option.  Then go back to System preferences and toggle the option to allow the program to run.
 
 *_I haven't figured out how to bundle the zip folder with a working relative shortcut..._
 
