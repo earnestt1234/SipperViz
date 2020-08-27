@@ -283,6 +283,21 @@ def date_format_x(ax, start, end):
 
 #---interdrink interval helpers
 def get_any_idi(sipper):
+    """
+    Returns the interdrink intervals for a Sipper,
+    disregarding side or bottle contents
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+
+    Returns
+    -------
+    idi_minutes : pandas.Series
+        array of the interdrink intervals in minutes
+
+    """
     data = sipper.data
     combined = data['LeftCount'].diff() + data['RightCount'].diff()
     combined.dropna(inplace=True)
@@ -292,6 +307,23 @@ def get_any_idi(sipper):
     return idi_minutes
 
 def get_side_idi(sipper, side):
+    """
+    Returns the interdrink intervals for the left or right bottle of a Sipper
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+
+    side : str ('left' or 'right')
+        side to return the interdrink intervals for
+
+    Returns
+    -------
+    idi_minutes : pandas.Series
+        array of the interdrink intervals in minutes
+
+    """
     data = sipper.data
     col = 'LeftCount' if side.lower() == 'left' else 'RightCount'
     diff = data[col].diff().dropna()
@@ -300,7 +332,29 @@ def get_side_idi(sipper, side):
     idi_minutes = idi_delta.dt.total_seconds()/60
     return idi_minutes
 
-def get_content_idi(sipper, content, df):
+def get_content_idi(sipper, content, df=pd.DataFrame()):
+    """
+    Returns the interdrink intervals for specific bottle contents of a Sipper
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+
+    content : str
+        str name of content to get values for
+
+    df : pandas.DataFrame, optional
+        a DataFrame of sipper data to get the values for, can be passed
+        when you want values for a modified version of data (e.g.
+        after doing a global date filter)
+
+    Returns
+    -------
+    idi_minutes : pandas.Series
+        array of the interdrink intervals in minutes
+
+    """
     vals = sipper.get_content_values(content, out='Count', df=df)
     if vals.empty:
         return vals
@@ -311,6 +365,21 @@ def get_content_idi(sipper, content, df):
     return idi_minutes
 
 def setup_idi_axes(ax, logx):
+    """
+    Helper to prepare plots for interdrink interval histograms
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        plot axes
+    logx : bool
+        whether or not to create a logarithmic x-axis
+
+    Returns
+    -------
+    None.
+
+    """
     ax.set_xlabel('Minutes Between Drinks')
     ax.set_title('Interdrink Interval Plot')
     if logx:
@@ -325,6 +394,25 @@ def setup_idi_axes(ax, logx):
 
 #---circadian helpers
 def get_chronogram_vals(series, lights_on, lights_off):
+    """
+    Convert a time series to chronongram values (i.e. averaged
+    by hour for the light cycle)
+
+    Parameters
+    ----------
+    series : pandas.Series
+        time series data
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle
+
+    Returns
+    -------
+    reindexed : pandas.Series
+        Series of chronogram values, with 0 being start of the light cycle
+
+    """
     byhour = series.groupby([series.index.hour]).sum()
     byhourday = series.groupby([series.index.hour, series.index.date])
     num_days_by_hour = byhourday.sum().index.get_level_values(0).value_counts()
@@ -338,6 +426,38 @@ def get_chronogram_vals(series, lights_on, lights_off):
 #---averageing helpers
 def preproc_averaging(data, averaging='datetime', avg_bins='1H',
                       agg='sum'):
+    """
+    Average data for SipperViz
+
+    Parameters
+    ----------
+    data : collection
+        collection of pandas.Series to average
+    averaging : str, optional
+        Style of averaging. The default is 'datetime'.
+        - 'datetime' = average in absolute time (no alignment, fails for
+          time series which did not cooccur)
+        - 'time' = align by time of day and then average
+        - 'elapsed' = align by start of recording and then average
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    agg : str, optional
+        Function to aggregate data after downsampling; this is a
+        string name of a function used by pandas for resampling.
+        The default is 'sum'.
+
+    Raises
+    ------
+    SipperError
+        When "averaging" parameter is not recognized
+
+    Returns
+    -------
+    output : dict
+        Dictionary of results, with keys:
+            - 'x' : x posititions of data
+            - 'ys' : averaged data
+    """
     if averaging not in ['datetime','time','elapsed']:
         raise SipperError('averaging must be "datetime", "time", or "elapsed"')
     output = {}
@@ -398,6 +518,32 @@ def preproc_averaging(data, averaging='datetime', avg_bins='1H',
 
 def format_averaging_axes(ax, averaging, xdata, shade_dark=True,
                           lights_on=7, lights_off=19):
+    """
+    Helper function to setup axes for average plots in SipperViz
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        plot axes
+    averaging : str, optional
+        Style of averaging. The default is 'datetime', other options
+        are 'time' and 'elapsed'
+    xdata : array
+        x-positions of plotted data.  If multiple lines were plotted,
+        this array should encompass all of them
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+        Has no effect when averaging is 'elapsed'. The default is True.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+
+    Returns
+    -------
+    None.
+
+    """
     if averaging  == 'datetime':
         mindate = pd.Timestamp(2200,1,1,0,0,0)
         maxdate = pd.Timestamp(1970,1,1,0,0,0)
@@ -455,6 +601,36 @@ def format_averaging_axes(ax, averaging, xdata, shade_dark=True,
 def drinkcount_cumulative(sipper, show_left=True, show_right=True,
                           show_content=[], shade_dark=True,
                           lights_on=7, lights_off=19, **kwargs):
+    """
+    Plot the cumulative drink count of a Sipper.
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' in kwargs:
         ax = kwargs['ax']
     else:
@@ -500,6 +676,38 @@ def drinkcount_cumulative(sipper, show_left=True, show_right=True,
 def drinkcount_binned(sipper, binsize='1H', show_left=True, show_right=True,
                       show_content=[], shade_dark=True,
                       lights_on=7, lights_off=19, **kwargs):
+    """
+    Plot the binned drink count of a Sipper.
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+    binsize : str, optional
+        Pandas time offset string to resample data. The default is '1H'.
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' in kwargs:
         ax = kwargs['ax']
     else:
@@ -549,6 +757,36 @@ def drinkcount_binned(sipper, binsize='1H', show_left=True, show_right=True,
 def drinkduration_cumulative(sipper, show_left=True, show_right=True,
                              show_content=[], shade_dark=True,
                              lights_on=7, lights_off=19, **kwargs):
+    """
+    Plot the cumulative drink duration of a Sipper.
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' in kwargs:
         ax = kwargs['ax']
     else:
@@ -594,6 +832,38 @@ def drinkduration_cumulative(sipper, show_left=True, show_right=True,
 def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
                          show_content=[], shade_dark=True,
                          lights_on=7, lights_off=19, **kwargs):
+    """
+    Plot the binned drink count of a Sipper.
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+    binsize : str, optional
+        Pandas time offset string to resample data. The default is '1H'.
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' in kwargs:
         ax = kwargs['ax']
     else:
@@ -644,6 +914,31 @@ def drinkduration_binned(sipper, binsize='1H', show_left=True, show_right=True,
 
 def interdrink_intervals(sippers, kde=True, logx=True,
                          combine=False, **kwargs):
+    """
+    Plot a histogram of the interdrink intervals of multiple Sippers
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    kde : bool, optional
+        Include a kernel density estimation. The default is True.
+    logx : bool, optional
+        Use a logarithmic x-axis. The default is True.
+    combine : bool, optional
+        Concate the data from all sippers. The default is False,
+        which plots data for each Sipper separately.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -677,6 +972,29 @@ def interdrink_intervals(sippers, kde=True, logx=True,
     return fig if 'ax' not in kwargs else None
 
 def interdrink_intervals_byside(sippers, kde=True, logx=True, **kwargs):
+    """
+    Plot a histogram of the interdrink intervals of multiple Sippers,
+    with one curve for each bottle
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    kde : bool, optional
+        Include a kernel density estimation. The default is True.
+    logx : bool, optional
+        Use a logarithmic x-axis. The default is True.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -707,13 +1025,38 @@ def interdrink_intervals_byside(sippers, kde=True, logx=True, **kwargs):
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
-def interdrink_intervals_bycontent(sippers, show_content, kde=True, logx=True, **kwargs):
+def interdrink_intervals_bycontent(sippers, idi_content, kde=True, logx=True, **kwargs):
+    """
+    Plot a histogram of the interdrink intervals of multiple Sippers,
+    with one curve for each included content
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    show_content: collection:
+        Array of str names of bottle contents
+    kde : bool, optional
+        Include a kernel density estimation. The default is True.
+    logx : bool, optional
+        Use a logarithmic x-axis. The default is True.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
         ax = kwargs['ax']
     setup_idi_axes(ax, logx)
-    for c in show_content:
+    for c in idi_content:
         combined = []
         for sipper in sippers:
             df = sipper.data.copy()
@@ -741,6 +1084,37 @@ def interdrink_intervals_bycontent(sippers, show_content, kde=True, logx=True, *
 def drinkcount_chronogram(sipper, circ_left=True, circ_right=True,
                           circ_content=None, lights_on=7,
                           lights_off=19, shade_dark=True, **kwargs):
+    """
+    Plot the drink count for a Sipper, taking an average for each hour
+    of the day
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+    circ_left : bool, optional
+        Show drinks for the left side. The default is True.
+    circ_right : bool, optional
+        Show drinks for the right side. The default is True.
+    circ_content : collection, optional
+        Show drinks for each content name in the collection. The default is None.
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -788,6 +1162,45 @@ def drinkcount_chronogram_grouped(sippers, groups, circ_left=True, circ_right=Tr
                                   circ_content=None, circ_var='SEM',
                                   circ_show_indvl=False, lights_on=7,
                                   lights_off=19, shade_dark=True, **kwargs):
+    '''
+    Plot the drink count for multiple Sippers, taking an average for each hour
+    of the day, and averaging those values for Groups.
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    circ_left : bool, optional
+        Show drinks for the left side. The default is True.
+    circ_right : bool, optional
+        Show drinks for the right side. The default is True.
+    circ_content : collection, optional
+        Show drinks for each content name in the collection. The default is None.
+    circ_var : str, optional
+        How to shade error for each group. The default is 'SEM', can also be
+        'STD' or ther will be no effect.
+    circ_show_indvl : bool, optional
+        Include curve for each individual device. The default is False.
+     shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    '''
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -853,6 +1266,37 @@ def drinkcount_chronogram_grouped(sippers, groups, circ_left=True, circ_right=Tr
 def drinkduration_chronogram(sipper, circ_left=True, circ_right=True,
                              circ_content=None, lights_on=7,
                              lights_off=19, shade_dark=True, **kwargs):
+    """
+    Plot the drink duration for a Sipper, taking an average for each hour
+    of the day
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+    circ_left : bool, optional
+        Show drinks for the left side. The default is True.
+    circ_right : bool, optional
+        Show drinks for the right side. The default is True.
+    circ_content : collection, optional
+        Show drinks for each content name in the collection. The default is None.
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -900,6 +1344,45 @@ def drinkduration_chronogram_grouped(sippers, groups, circ_left=True, circ_right
                                      circ_content=None, circ_var='SEM',
                                      circ_show_indvl=False, lights_on=7,
                                      lights_off=19, shade_dark=True, **kwargs):
+    '''
+    Plot the drink duration for multiple Sippers, taking an average for each hour
+    of the day, and averaging those values for Groups.
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    circ_left : bool, optional
+        Show drinks for the left side. The default is True.
+    circ_right : bool, optional
+        Show drinks for the right side. The default is True.
+    circ_content : collection, optional
+        Show drinks for each content name in the collection. The default is None.
+    circ_var : str, optional
+        How to shade error for each group. The default is 'SEM', can also be
+        'STD' or ther will be no effect.
+    circ_show_indvl : bool, optional
+        Include curve for each individual device. The default is False.
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    '''
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -966,6 +1449,36 @@ def drinkduration_chronogram_grouped(sippers, groups, circ_left=True, circ_right
 
 def side_preference(sipper, pref_side='Left', pref_metric='Count', pref_bins='1H',
                     lights_on=7, lights_off=19, shade_dark=True, **kwargs):
+    '''
+    Plot the preference for one bottle over the other
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+    pref_side : str ('Left' or 'Right'), optional
+        Side to calculate preference for. The default is 'Left'.
+    pref_metric : str ('Count' or 'Duration'), optional
+        Drink variable to use for calculating prefernce. The default is 'Count'.
+    pref_bins : str, optional
+        pandas time offset str to resample data. The default is '1H'.
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    '''
     if 'ax' in kwargs:
             ax = kwargs['ax']
     else:
@@ -1003,6 +1516,37 @@ def side_preference(sipper, pref_side='Left', pref_metric='Count', pref_bins='1H
 
 def content_preference(sipper, pref_content, pref_metric='Count', pref_bins='1H',
                        lights_on=7, lights_off=19, shade_dark=True, **kwargs):
+    '''
+    Plot the preference for one type of content (over anything else in
+    opposite bottle)
+
+    Parameters
+    ----------
+    sipper : Sipper
+        sipper data loaded into the Sipper class
+    pref_content : collection
+        Array of contents to calculate preference for.
+    pref_metric : str ('Count' or 'Duration'), optional
+        Drink variable to use for calculating prefernce. The default is 'Count'.
+    pref_bins : str, optional
+        pandas time offset str to resample data. The default is '1H'.
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    '''
     if 'ax' in kwargs:
             ax = kwargs['ax']
     else:
@@ -1055,6 +1599,49 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
                         avg_var='SEM', show_left=True, show_right=True,
                         show_content=[], shade_dark=True, lights_on=7,
                         lights_off=19, **kwargs):
+    """
+    Plot the binned drink count for multiple Sippers, averaged by Group
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    averaging : str, optional
+        Style of averaging. The default is 'datetime'.
+        - 'datetime' = average in absolute time (no alignment, fails for
+          time series which did not cooccur)
+        - 'time' = align by time of day and then average
+        - 'elapsed' = align by start of recording and then average
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    avg_var : str ('SEM','STD', or 'Individual Data'), optional
+        How to show variance around the average. The default is 'SEM'.
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -1108,10 +1695,148 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
+def cumulative_averaged_drinkcount(sippers, groups, avg_bins='1H',
+                                   avg_var='SEM', show_left=True, show_right=True,
+                                   show_content=[], shade_dark=True, lights_on=7,
+                                   lights_off=19, **kwargs):
+    """
+    Plot the cumulative drink count for multiple Sippers, averaged by Group
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    avg_var : str ('SEM','STD', or 'Individual Data'), optional
+        How to show variance around the average. The default is 'SEM'.
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
+    averaging = 'elapsed'
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    to_plot = defaultdict(list)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if show_left:
+                    key = '{} - Left'.format(group)
+                    to_plot[key].append(df['LeftCount'])
+                if show_right:
+                    key = '{} - Right'.format(group)
+                    to_plot[key].append(df['RightCount'])
+                if show_content:
+                    for c in show_content:
+                        key = '{} - {}'.format(group, c)
+                        vals = sipper.get_content_values(c, out='Count',
+                                                         df=df)
+                        if not vals.empty:
+                            to_plot[key].append(vals)
+    xdata = []
+    for i, (label, data) in enumerate(to_plot.items()):
+        error_shade = np.nan
+        processed = preproc_averaging(data, averaging=averaging,
+                                      avg_bins=avg_bins, agg='max')
+        x = processed['x']
+        xdata.append(x)
+        ys = processed['ys']
+        mean = np.nanmean(ys, axis=0)
+        if avg_var == 'Individual Data':
+            for y in ys:
+                ax.plot(x, y, color=colors[i], alpha=.5, linewidth=.8)
+        if avg_var == 'SEM':
+            error_shade = stats.sem(ys, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            error_shade = np.nanstd(ys, axis=0)
+        ax.plot(x, mean, label=label, color=colors[i])
+        ax.fill_between(x, mean-error_shade, mean+error_shade, color=colors[i],
+                        alpha=.3)
+    format_averaging_axes(ax, averaging, xdata)
+    ax.set_title('Cumulative Average Drink Count')
+    ax.set_ylabel('Total Drinks')
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
 def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
                            avg_var='SEM', show_left=True, show_right=True,
                            show_content=[], shade_dark=True, lights_on=7,
                            lights_off=19, **kwargs):
+    """
+    Plot the binned drink duration for multiple Sippers, averaged by Group
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    averaging : str, optional
+        Style of averaging. The default is 'datetime'.
+        - 'datetime' = average in absolute time (no alignment, fails for
+          time series which did not cooccur)
+        - 'time' = align by time of day and then average
+        - 'elapsed' = align by start of recording and then average
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    avg_var : str ('SEM','STD', or 'Individual Data'), optional
+        How to show variance around the average. The default is 'SEM'.
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -1165,9 +1890,145 @@ def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
+def cumulative_averaged_drinkduration(sippers, groups, avg_bins='1H',
+                                      avg_var='SEM', show_left=True, show_right=True,
+                                      show_content=[], shade_dark=True, lights_on=7,
+                                      lights_off=19, **kwargs):
+    """
+    Plot the cumulative drink duration for multiple Sippers, averaged by Group
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    avg_var : str ('SEM','STD', or 'Individual Data'), optional
+        How to show variance around the average. The default is 'SEM'.
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
+    averaging = 'elapsed'
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    to_plot = defaultdict(list)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if show_left:
+                    key = '{} - Left'.format(group)
+                    to_plot[key].append(df['LeftDuration'])
+                if show_right:
+                    key = '{} - Right'.format(group)
+                    to_plot[key].append(df['RightDuration'])
+                if show_content:
+                    for c in show_content:
+                        key = '{} - {}'.format(group, c)
+                        vals = sipper.get_content_values(c, out='Duration',
+                                                         df=df)
+                        if not vals.empty:
+                            to_plot[key].append(vals)
+    xdata = []
+    for i, (label, data) in enumerate(to_plot.items()):
+        error_shade = np.nan
+        processed = preproc_averaging(data, averaging=averaging,
+                                      avg_bins=avg_bins, agg='max')
+        x = processed['x']
+        xdata.append(x)
+        ys = processed['ys']
+        mean = np.nanmean(ys, axis=0)
+        if avg_var == 'Individual Data':
+            for y in ys:
+                ax.plot(x, y, color=colors[i], alpha=.5, linewidth=.8)
+        if avg_var == 'SEM':
+            error_shade = stats.sem(ys, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            error_shade = np.nanstd(ys, axis=0)
+        ax.plot(x, mean, label=label, color=colors[i])
+        ax.fill_between(x, mean-error_shade, mean+error_shade, color=colors[i],
+                        alpha=.3)
+    format_averaging_axes(ax, averaging, xdata)
+    ax.set_title('Cumulative Average Drink Count')
+    ax.set_ylabel('Total Drink Duration (s)')
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
 def averaged_side_preference(sippers, groups, averaging='datetime', avg_bins='1H',
                              avg_var='SEM', pref_side='Left', pref_metric='Count',
                              shade_dark=True, lights_on=7, lights_off=19, **kwargs):
+    """
+    Plot the binned bottle side preference for multiple Sippers, averaged by Group
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    averaging : str, optional
+        Style of averaging. The default is 'datetime'.
+        - 'datetime' = average in absolute time (no alignment, fails for
+          time series which did not cooccur)
+        - 'time' = align by time of day and then average
+        - 'elapsed' = align by start of recording and then average
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    avg_var : str ('SEM','STD', or 'Individual Data'), optional
+        How to show variance around the average. The default is 'SEM'.
+    pref_side : str ('Left' or 'Right'), optional
+        Side to calculate preference for. The default is 'Left'.
+    pref_metric : str ('Count' or 'Duration'), optional
+        Drink variable to use for calculating prefernce. The default is 'Count'.
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
@@ -1224,9 +2085,51 @@ def averaged_side_preference(sippers, groups, averaging='datetime', avg_bins='1H
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
-def averaged_content_preference(sippers, groups, averaging='datetime', avg_bins='1H',
-                                avg_var='SEM', pref_content=[], pref_metric='Count',
-                                shade_dark=True, lights_on=7, lights_off=19, **kwargs):
+def averaged_content_preference(sippers, groups, pref_content=[],
+                                pref_metric='Count', averaging='datetime',
+                                avg_bins='1H', avg_var='SEM', shade_dark=True,
+                                lights_on=7, lights_off=19, **kwargs):
+    """
+    Plot the binned content preference for multiple Sippers, averaged by Group
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    pref_content : collection
+        Array of contents to calculate preference for.
+    pref_metric : str ('Count' or 'Duration'), optional
+        Drink variable to use for calculating prefernce. The default is 'Count'.
+    averaging : str, optional
+        Style of averaging. The default is 'datetime'.
+        - 'datetime' = average in absolute time (no alignment, fails for
+          time series which did not cooccur)
+        - 'time' = align by time of day and then average
+        - 'elapsed' = align by start of recording and then average
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    avg_var : str ('SEM','STD', or 'Individual Data'), optional
+        How to show variance around the average. The default is 'SEM'.
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
     if 'ax' not in kwargs:
         fig, ax = plt.subplots()
     else:
