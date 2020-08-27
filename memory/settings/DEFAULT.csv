@@ -1,11 +1,13 @@
 ,Value
 lights_on,7 am
 lights_off,7 pm
+img_format,.png
 groupload_abs,True
 load_dups,True
+warn_dupindex,True
 dfilter_val,False
-dfilter_sdate,2020-08-21
-dfilter_edate,2020-08-21
+dfilter_sdate,2020-08-27
+dfilter_edate,2020-08-27
 dfilter_shour,noon
 dfilter_ehour,noon
 shade_dark,True
@@ -23,7 +25,7 @@ circ_show_indvl,False
 circ_var,SEM
 pref_side,Left
 pref_metric,Count
-pref_bins,4 hours
+pref_bins,1 hour
 averaging,Absolute Time
-avg_bins,4 hours
+avg_bins,1 hour
 avg_var,SEM

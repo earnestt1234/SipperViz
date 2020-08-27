@@ -133,7 +133,11 @@ class SipperViz(tk.Tk):
             sipperplots.averaged_side_preference:
                 'Average Side Preference',
             sipperplots.averaged_content_preference:
-                'Average Content Preference'}
+                'Average Content Preference',
+            sipperplots.cumulative_averaged_drinkcount:
+                'Cumulative Average Drink Count',
+            sipperplots.cumulative_averaged_drinkduration:
+                'Cumulative Average Drink Duration'}
         self.plot_names_to_funcs = {v:k for k,v in self.plot_default_names.items()}
 
         #link each plot to its function for retrieving data
@@ -170,6 +174,8 @@ class SipperViz(tk.Tk):
                 sipperplots.averaged_drinkduration,
                 sipperplots.averaged_side_preference,
                 sipperplots.averaged_content_preference,
+                sipperplots.cumulative_averaged_drinkcount,
+                sipperplots.cumulative_averaged_drinkduration
                 ]:
             self.plot_routes[func] = self.group_plot
 
@@ -564,6 +570,16 @@ class SipperViz(tk.Tk):
         self.lightsoff_menu = ttk.Combobox(self.general_settings, width=10,
                                            values=self.times)
 
+        self.img_format_label = tk.Label(self.general_settings,
+                                         text='Default image saving format')
+        self.img_format_menu = ttk.Combobox(self.general_settings,
+                                            values = ['.png',
+                                                      '.svg',
+                                                      '.jpg',
+                                                      '.pdf',
+                                                      '.tif'])
+        self.img_format_menu.set('.png')
+
         self.groupload_abs_val = tk.BooleanVar()
         self.groupload_abs_val.set(True)
         self.groupload_abs_box = ttk.Checkbutton(self.general_settings,
@@ -594,14 +610,16 @@ class SipperViz(tk.Tk):
         self.lightson_menu.grid(row=0,column=1, sticky='nsew', padx=20, pady=5)
         self.lightsoff_label.grid(row=1, column=0, sticky='nsw', padx=20, pady=5)
         self.lightsoff_menu.grid(row=1,column=1, sticky='nsew', padx=20, pady=5)
-        self.groupload_abs_box.grid(row=2, column=0, sticky='nsew', padx=20, pady=5,
+        self.img_format_label.grid(row=2,column=0, sticky='nsw', padx=20, pady=5)
+        self.img_format_menu.grid(row=2,column=1, sticky='nsew', padx=20, pady=5)
+        self.groupload_abs_box.grid(row=3, column=0, sticky='nsew', padx=20, pady=5,
                                     columnspan=2)
-        self.load_dups_box.grid(row=3, column=0, sticky='nsew', padx=20, pady=5,
+        self.load_dups_box.grid(row=4, column=0, sticky='nsew', padx=20, pady=5,
                                 columnspan=2)
-        self.warn_dupindex_box.grid(row=4, column=0, sticky='nsew', padx=20, pady=5,
+        self.warn_dupindex_box.grid(row=5, column=0, sticky='nsew', padx=20, pady=5,
                                     columnspan=2)
-        self.save_settings_button.grid(row=5, column=0, sticky='nsew', padx=20, pady=5)
-        self.load_settings_button.grid(row=5, column=1, sticky='nsew', padx=20, pady=5)
+        self.save_settings_button.grid(row=6, column=0, sticky='nsew', padx=20, pady=5)
+        self.load_settings_button.grid(row=6, column=1, sticky='nsew', padx=20, pady=5)
 
     #---create assign contents window
         self.contents_window = tk.Toplevel(self)
@@ -745,6 +763,8 @@ class SipperViz(tk.Tk):
         self.makeplot_selection.insert(self.makeplot_drinks, 4, text='Drink Duration (Cumulative)')
         self.makeplot_selection.insert(self.makeplot_drinks, 5, text='Drink Duration (Binned)')
         self.makeplot_selection.insert(self.makeplot_drinks, 6, text='Average Drink Duration')
+        self.makeplot_selection.insert(self.makeplot_drinks, 7, text='Cumulative Average Drink Count')
+        self.makeplot_selection.insert(self.makeplot_drinks, 7, text='Cumulative Average Drink Duration')
         self.makeplot_pref = self.makeplot_selection.insert('', 2, text='Preference',
                                                             open=True)
         self.makeplot_selection.insert(self.makeplot_pref, 1, text='Side Preference')
@@ -938,6 +958,30 @@ class SipperViz(tk.Tk):
         self.load_abort.grid(row=2, column=0, sticky='nsew', padx=20, pady=5,
                              columnspan=2)
 
+    #---create reasons window
+        self.reasons_window = tk.Toplevel(self)
+        self.reasons_window.title('Plot Availability')
+        self.reasons_window.withdraw()
+        if not platform.system() == 'Darwin':
+            self.reasons_window.iconbitmap(self.exepath('img/sipperviz.ico'))
+        self.reasons_window.protocol("WM_DELETE_WINDOW",
+                                     self.reasons_window.withdraw)
+
+    #---populate reasons window
+        self.reasons_window.grid_rowconfigure(0, weight=1)
+        self.reasons_window.columnconfigure(0, weight=1)
+        labels = ['Plot', 'Plottable?']
+        self.reasons_view = ttk.Treeview(self.reasons_window,
+                                         columns=labels,
+                                         selectmode='none',
+                                         height=20)
+        self.reasons_view['show'] = 'headings'
+        self.reasons_view.column('Plot', width=270)
+        self.reasons_view.heading(0, text='Plot')
+        self.reasons_view.column('Plottable?', width=900)
+        self.reasons_view.heading(1, text='Plottable?')
+        self.reasons_view.grid(row=0, column=0, sticky='nsew')
+
     #---create treeview panes (left sash)
         self.left_sash = ttk.PanedWindow(self.main_frame, orient='vertical')
 
@@ -1000,6 +1044,10 @@ class SipperViz(tk.Tk):
                                   self.iter_plot(sipperplots.drinkduration_binned))
         self.plotmenu.add_command(label='Average Drink Duration', command=lambda:
                                   self.group_plot(sipperplots.averaged_drinkduration))
+        self.plotmenu.add_command(label='Cumulative Average Drink Count', command=lambda:
+                                  self.group_plot(sipperplots.cumulative_averaged_drinkcount))
+        self.plotmenu.add_command(label='Cumulative Average Drink Duration', command=lambda:
+                                  self.group_plot(sipperplots.cumulative_averaged_drinkduration))
         self.plotmenu.add_separator()
         self.plotmenu.add_command(label='Side Preference', command=lambda:
                                   self.iter_plot(sipperplots.side_preference))
@@ -1048,6 +1096,10 @@ class SipperViz(tk.Tk):
         self.optionsmenu.add_command(label='General settings',
                                      command=self.general_settings.deiconify)
         self.menubar.add_cascade(menu=self.optionsmenu, label='Options')
+        self.helpmenu = tk.Menu(self.menubar, tearoff=0)
+        self.helpmenu.add_command(label='Explain plot availability',
+                                  command=self.reasons_window.deiconify)
+        self.menubar.add_cascade(menu=self.helpmenu, label='Help')
 
     #---create main buttons
         self.button_frame = tk.Frame(self.main_frame)
@@ -1263,13 +1315,18 @@ class SipperViz(tk.Tk):
         self.bind(ctrla2, self.select_all)
 
     #---operations pre opening
-        last_settings = 'memory/settings/LAST_USED.CSV'
+        last_settings = self.exepath('memory/settings/LAST_USED.CSV')
+        defaults = self.exepath('memory/settings/LAST_USED.CSV')
         if os.path.isfile(last_settings):
             # self.load_settings_df(last_settings) #for testing
             try:
                 self.load_settings_df(last_settings)
             except:
                 print('Found LAST_USED settings but unable to load!')
+                try:
+                    self.load_settings_df(defaults)
+                except:
+                    print('Found DEFAULT.CSV but unable to load!')
         self.set_date_filter_state()
         self.update_all_buttons()
 
@@ -1449,8 +1506,10 @@ class SipperViz(tk.Tk):
         self.update_makeplot_run()
         self.update_avail_contents()
         self.update_avail_groups()
+        self.update_group_manager()
         self.update_all_menus()
         self.display_details()
+        self.update_reasons_view()
         self.update()
 
     def update_main_buttons(self, *event):
@@ -1842,6 +1901,8 @@ class SipperViz(tk.Tk):
         if graphname in [
                 'Average Drink Count',
                 'Average Drink Duration',
+                'Cumulative Average Drink Count',
+                'Cumulative Average Drink Duration'
                 ]:
             if self.groupselect.selection():
                 if (self.drink_showleft_val.get() or
@@ -1856,6 +1917,99 @@ class SipperViz(tk.Tk):
                 plottable = True
         return plottable
 
+    def plottable_reasons(self, graphname):
+        reasons = []
+        if graphname in [
+            'Drink Count (Cumulative)',
+            'Drink Duration (Cumulative)',
+            'Drink Count (Binned)',
+            'Drink Duration (Binned)',
+            ]:
+            if not self.file_view.selection():
+                reasons.append('no files selected')
+            if not (self.drink_showleft_val.get() or
+                    self.drink_showright_val.get() or
+                    self.drink_showcontent_val.get()):
+                reasons.append('no drink plot options selected (Plot Settings > Drinks)')
+            if (not self.drink_showleft_val.get() and
+                not self.drink_showright_val.get() and
+                self.drink_showcontent_val.get() and
+                not self.contentselect.selection()):
+                reasons.append('plot drink contents checked but no contents selected (Plot Settings > Content)')
+        if graphname in [
+                'Interdrink Intervals',
+                'Interdrink Intervals (By Side)',
+                'Side Preference'
+                ]:
+            if not self.file_view.selection():
+                reasons.append('no files selected')
+        if graphname in [
+                'Chronogram (Drink Count)',
+                'Chronogram (Drink Duration)']:
+            if not self.file_view.selection():
+                reasons.append('no files selected')
+            if not (self.circ_showleft_val.get() or
+                    self.circ_showright_val.get() or
+                    self.circ_showcontent_val.get()):
+                reasons.append('no circadian plot options selected (Plot Settings > Circadian)')
+            if (not self.circ_showleft_val.get() and
+                not self.circ_showright_val.get() and
+                self.circ_showcontent_val.get() and
+                not self.contentselect.selection()):
+                reasons.append('plot circadian contents checked but no contents selected (Plot Settings > Content)')
+        if graphname in [
+                'Interdrink Intervals (By Content)',
+                'Content Preference'
+                ]:
+            if not self.file_view.selection():
+                reasons.append('no files selected')
+            if not self.contentselect.selection():
+                reasons.append('no contents selected (Plot Settings > Content)')
+        if graphname in [
+                'Grouped Chronogram (Drink Count)',
+                'Grouped Chronogram (Drink Duration)'
+                ]:
+            if not self.groupselect.selection():
+                reasons.append('no groups selected (Plot Settings > Groups)')
+            if not (self.circ_showleft_val.get() or
+                    self.circ_showright_val.get() or
+                    self.circ_showcontent_val.get()):
+                reasons.append('no circadian plot options selected (Plot Settings > Circadian)')
+            if (not self.circ_showleft_val.get() and
+                not self.circ_showright_val.get() and
+                self.circ_showcontent_val.get() and
+                not self.contentselect.selection()):
+                reasons.append('plot circadian contents checked but no contents selected (Plot Settings > Content)')
+        if graphname in [
+                'Average Drink Count',
+                'Average Drink Duration',
+                'Cumulative Average Drink Count',
+                'Cumulative Average Drink Duration'
+                ]:
+            if not self.groupselect.selection():
+                reasons.append('no groups selected (Plot Settings > Groups)')
+            if not (self.drink_showleft_val.get() or
+                    self.drink_showright_val.get() or
+                    self.drink_showcontent_val.get()):
+                reasons.append('no drink plot options selected (Plot Settings > Drinks)')
+            if (not self.drink_showleft_val.get() and
+                not self.drink_showright_val.get() and
+                self.drink_showcontent_val.get() and
+                not self.contentselect.selection()):
+                reasons.append('plot drink contents checked but no contents selected (Plot Settings > Content)')
+        if graphname == 'Average Side Preference':
+            if not self.groupselect.selection():
+                reasons.append('no groups selected (Plot Settings > Groups)')
+        if graphname == 'Average Content Preference':
+            if not self.groupselect.selection():
+                reasons.append('no groups selected (Plot Settings > Groups)')
+            if not self.contentselect.selection():
+                reasons.append('no contents selected (Plot Settings > Content)')
+        if reasons:
+            return 'No: ' + ", ".join(reasons)
+        else:
+            return 'Yes'
+
     def is_replottable(self, plot):
         plottable = True
         if 'sipper' in plot.args:
@@ -1868,6 +2022,12 @@ class SipperViz(tk.Tk):
             if len(self.groupselect.selection()) == 0:
                 plottable = False
         return plottable
+
+    def update_reasons_view(self):
+        self.reasons_view.delete(*self.reasons_view.get_children())
+        for name in self.plot_default_names.values():
+            values = [name, self.plottable_reasons(name)]
+            self.reasons_view.insert('', 'end', values=values)
 
     def raise_makeplot_window(self):
         self.makeplot_window.deiconify()
@@ -1976,14 +2136,24 @@ class SipperViz(tk.Tk):
             self.plot_info.delete(*self.plot_info.get_children())
 
     def save_plots(self):
+        values = ['.png',
+                                                      '.svg',
+                                                      '.jpg',
+                                                      '.pdf',
+                                                      '.tif']
+        default = self.img_format_menu.get()
         selected = self.plot_list.selection()
         if len(selected) == 1:
             s = self.loaded_plots[selected[0]]
-            filetypes = [('Portable Network Graphic', '*.png')]
+            filetypes = [('Portable Network Graphic', '*.png'),
+                         ('Scalable Vector Graphics', '*.svg'),
+                         ('JPEG', '*.jpg'),
+                         ('Portable Document Format', '*.pdf'),
+                         ('Tagged Image File', '*.tif')]
             savepath = tk.filedialog.asksaveasfilename(title='Save plot',
-                                                        defaultextension='.csv',
-                                                        initialfile=s.name,
-                                                        filetypes=filetypes)
+                                                       defaultextension=default,
+                                                       initialfile=s.name,
+                                                       filetypes=filetypes)
             if savepath:
                 self.fig.savefig(savepath, dpi=300)
                 self.fig.set_dpi(100)
@@ -1997,7 +2167,7 @@ class SipperViz(tk.Tk):
                 for s in selected:
                     plot = self.loaded_plots.get(s)
                     self.display_plot(plot)
-                    save_name = plot.name + '.png'
+                    save_name = plot.name + default
                     full_save = os.path.join(folder, save_name)
                     final = self.create_file_name(full_save)
                     self.fig.savefig(final, dpi=300)
@@ -2227,6 +2397,9 @@ class SipperViz(tk.Tk):
                     for grp in df[lookfor]:
                         if not pd.isna(grp):
                             s.groups.append(str(grp))
+                            if grp not in self.loaded_groups:
+                                self.loaded_groups.append(grp)
+        self.update_group_manager()
         self.update_avail_groups()
         self.display_details()
         for g in self.avail_groups:
@@ -2276,6 +2449,8 @@ class SipperViz(tk.Tk):
             for g in s.groups:
                 if g not in self.avail_groups:
                     self.avail_groups.append(g)
+                if g not in self.loaded_groups:
+                    self.loaded_groups.append(g)
         self.avail_groups.sort()
         self.update_groupselect()
 
@@ -2296,6 +2471,7 @@ class SipperViz(tk.Tk):
     def get_settings_dict(self):
         settings_dict = dict(lights_on       =self.lightson_menu.get(),
                              lights_off      =self.lightsoff_menu.get(),
+                             img_format      =self.img_format_menu.get(),
                              groupload_abs   =self.groupload_abs_val.get(),
                              load_dups       =self.load_dups_val.get(),
                              warn_dupindex   =self.warn_dupindex_val.get(),
@@ -2402,6 +2578,7 @@ class SipperViz(tk.Tk):
         self.shade_dark_val.set(df.loc['shade_dark', v])
         self.lightson_menu.set(df.loc['lights_on', v])
         self.lightsoff_menu.set(df.loc['lights_off', v])
+        self.img_format_menu.set(df.loc['img_format', v])
         self.groupload_abs_val.set(df.loc['groupload_abs', v])
         self.load_dups_val.set(df.loc['load_dups', v])
         self.warn_dupindex_val.set(df.loc['warn_dupindex', v])
@@ -2678,7 +2855,7 @@ class SipperViz(tk.Tk):
                 self.contentselect.selection_add(c)
 
     #---menu bar
-    def get_menu_index(self, menu, name, limit=20):
+    def get_menu_index(self, menu, name, limit=25):
         for i in range(limit):
             try:
                 if name == menu.entrycget(i, 'label'):

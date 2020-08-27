@@ -1695,6 +1695,101 @@ def averaged_drinkcount(sippers, groups, averaging='datetime', avg_bins='1H',
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
+def cumulative_averaged_drinkcount(sippers, groups, avg_bins='1H',
+                                   avg_var='SEM', show_left=True, show_right=True,
+                                   show_content=[], shade_dark=True, lights_on=7,
+                                   lights_off=19, **kwargs):
+    """
+    Plot the cumulative drink count for multiple Sippers, averaged by Group
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    avg_var : str ('SEM','STD', or 'Individual Data'), optional
+        How to show variance around the average. The default is 'SEM'.
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
+    averaging = 'elapsed'
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    to_plot = defaultdict(list)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if show_left:
+                    key = '{} - Left'.format(group)
+                    to_plot[key].append(df['LeftCount'])
+                if show_right:
+                    key = '{} - Right'.format(group)
+                    to_plot[key].append(df['RightCount'])
+                if show_content:
+                    for c in show_content:
+                        key = '{} - {}'.format(group, c)
+                        vals = sipper.get_content_values(c, out='Count',
+                                                         df=df)
+                        if not vals.empty:
+                            to_plot[key].append(vals)
+    xdata = []
+    for i, (label, data) in enumerate(to_plot.items()):
+        error_shade = np.nan
+        processed = preproc_averaging(data, averaging=averaging,
+                                      avg_bins=avg_bins, agg='max')
+        x = processed['x']
+        xdata.append(x)
+        ys = processed['ys']
+        mean = np.nanmean(ys, axis=0)
+        if avg_var == 'Individual Data':
+            for y in ys:
+                ax.plot(x, y, color=colors[i], alpha=.5, linewidth=.8)
+        if avg_var == 'SEM':
+            error_shade = stats.sem(ys, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            error_shade = np.nanstd(ys, axis=0)
+        ax.plot(x, mean, label=label, color=colors[i])
+        ax.fill_between(x, mean-error_shade, mean+error_shade, color=colors[i],
+                        alpha=.3)
+    format_averaging_axes(ax, averaging, xdata)
+    ax.set_title('Cumulative Average Drink Count')
+    ax.set_ylabel('Total Drinks')
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
 def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
                            avg_var='SEM', show_left=True, show_right=True,
                            show_content=[], shade_dark=True, lights_on=7,
@@ -1791,6 +1886,101 @@ def averaged_drinkduration(sippers, groups, averaging='datetime', avg_bins='1H',
     format_averaging_axes(ax, averaging, xdata)
     ax.set_title('Average Drink Duration')
     ax.set_ylabel('Drink Duration (s)')
+    ax.legend()
+    plt.tight_layout()
+    return fig if 'ax' not in kwargs else None
+
+def cumulative_averaged_drinkduration(sippers, groups, avg_bins='1H',
+                                      avg_var='SEM', show_left=True, show_right=True,
+                                      show_content=[], shade_dark=True, lights_on=7,
+                                      lights_off=19, **kwargs):
+    """
+    Plot the cumulative drink duration for multiple Sippers, averaged by Group
+
+    Parameters
+    ----------
+    sippers : collection
+        Array of Sipper objects
+    groups : collection
+        Array of group names, to aggregate Sipper objects based on their
+        "groups" attribute.
+    avg_bins : str, optional
+        Bin size to use for downsampling. The default is '1H'.
+    avg_var : str ('SEM','STD', or 'Individual Data'), optional
+        How to show variance around the average. The default is 'SEM'.
+    show_left : bool, optional
+        Show cumulative drinks for the left bottle
+    show_right : bool, optional
+        Show cumulative drinks for the right bottle
+    show_content : collection, optional
+        Array of contents to show drinks for. The default is [].
+    shade_dark : bool, optional
+        Whether or not to shade nighttime periods of the ax.
+    lights_on : int
+        Integer from 0-23 denoting start of light cycle. The default is 7.
+    lights_off : int
+        Integer from 0-23 denoting end of light cycle. The default is 19.
+    **kwargs :
+        date_filter : two-tuple of start and end date to filter data
+        ax : matplotlib axes to plot on
+        **kwargs also allow SipperViz to by lazy about passing settings
+        to functions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure (unless ax is passed, in which case none)
+
+    """
+    averaging = 'elapsed'
+    if 'ax' not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs['ax']
+    to_plot = defaultdict(list)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for group in groups:
+        for sipper in sippers:
+            if group in sipper.groups:
+                df = sipper.data
+                if 'date_filter' in kwargs:
+                    s, e = kwargs['date_filter']
+                    df = df[(df.index >= s) &
+                            (df.index <= e)].copy()
+                if show_left:
+                    key = '{} - Left'.format(group)
+                    to_plot[key].append(df['LeftDuration'])
+                if show_right:
+                    key = '{} - Right'.format(group)
+                    to_plot[key].append(df['RightDuration'])
+                if show_content:
+                    for c in show_content:
+                        key = '{} - {}'.format(group, c)
+                        vals = sipper.get_content_values(c, out='Duration',
+                                                         df=df)
+                        if not vals.empty:
+                            to_plot[key].append(vals)
+    xdata = []
+    for i, (label, data) in enumerate(to_plot.items()):
+        error_shade = np.nan
+        processed = preproc_averaging(data, averaging=averaging,
+                                      avg_bins=avg_bins, agg='max')
+        x = processed['x']
+        xdata.append(x)
+        ys = processed['ys']
+        mean = np.nanmean(ys, axis=0)
+        if avg_var == 'Individual Data':
+            for y in ys:
+                ax.plot(x, y, color=colors[i], alpha=.5, linewidth=.8)
+        if avg_var == 'SEM':
+            error_shade = stats.sem(ys, axis=0, nan_policy='omit')
+        elif avg_var == 'STD':
+            error_shade = np.nanstd(ys, axis=0)
+        ax.plot(x, mean, label=label, color=colors[i])
+        ax.fill_between(x, mean-error_shade, mean+error_shade, color=colors[i],
+                        alpha=.3)
+    format_averaging_axes(ax, averaging, xdata)
+    ax.set_title('Cumulative Average Drink Count')
+    ax.set_ylabel('Total Drink Duration (s)')
     ax.legend()
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
