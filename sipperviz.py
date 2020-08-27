@@ -192,6 +192,7 @@ class SipperViz(tk.Tk):
                               'show_left': 'show left',
                               'show_right': 'show right',
                               'show_content': 'content',
+                              'idi_content': 'content',
                               'binsize': 'binning size',
                               'kde': 'kernel density estimation',
                               'logx': 'logarithmic x-axis',
@@ -361,10 +362,11 @@ class SipperViz(tk.Tk):
         self.avg_settings = tk.Frame(self.plot_settings_window)
         self.plot_settings_tabs.add(self.avg_settings,
                                     text='Averaging')
-        s1 = 'The following settings affect Average Drink Count, and '
-        s2 = 'Average Drink Duration, Average Side Preference, and'
-        s3 = 'Average Content Preference plots.'
-        text = s1 + s2 + s3
+        text = ('The following settings affect Average Drink Count, '
+                'Average Drink Duration, Cumulative Average Drink Count, '
+                'Cumulative Average Drink Duration, Average Side Preference, '
+                'and Average Content Preference plots. Note that Cumulative '
+                'Average plots always use Elapsed Time averaging.')
         self.avg_settings_label = tk.Label(self.avg_settings, text=text,
                                            wraplength=600, justify='left')
         self.avg_method_label = tk.Label(self.avg_settings, text='Averaging method')
@@ -395,9 +397,10 @@ class SipperViz(tk.Tk):
                                     text='Drinks')
         s1 = 'The following settings affect the Drink Count (Cumulative), '
         s2 = 'Drink Count (Binned), Drink Duration (Cumulative), '
-        s3 = 'Drink Duration (Binned), Average Drink Count, and '
-        s4 = 'Average Drink Duration plots.'
-        text = s1 + s2 + s3 + s4
+        s3 = 'Drink Duration (Binned), Average Drink Count, '
+        s4 = 'Average Drink Duration, Cumulative Average Drink Count, '
+        s5 = 'and Cumulative Average Drink Duration plots.'
+        text = s1 + s2 + s3 + s4 + s5
         self.drink_settings_label = tk.Label(self.drink_settings, text=text,
                                              wraplength=600, justify='left')
         self.drink_showleft_val = tk.BooleanVar()
@@ -1709,7 +1712,7 @@ class SipperViz(tk.Tk):
                 args = {k:v for k,v in all_args.items() if k in func_args}
                 if self.date_filter_val.get():
                     b,e = self.get_date_filter_dates()
-                    if not sipperplots.date_filter_okay(s.data, b, e):
+                    if not sipper.date_filter_okay(s.data, b, e):
                             self.bad_date_sippers.append(s)
                             continue
                     else:
@@ -1739,7 +1742,7 @@ class SipperViz(tk.Tk):
             b,e = self.get_date_filter_dates()
             args['date_filter'] = b, e
             for s in sippers:
-                if not sipperplots.date_filter_okay(s.data, b, e):
+                if not sipper.date_filter_okay(s.data, b, e):
                         self.bad_date_sippers.append(s)
                         continue
         if self.bad_date_sippers:
@@ -1772,7 +1775,7 @@ class SipperViz(tk.Tk):
             b,e = self.get_date_filter_dates()
             args['date_filter'] = b, e
             for s in sippers:
-                if not sipperplots.date_filter_okay(s.data, b, e):
+                if not sipper.date_filter_okay(s.data, b, e):
                         self.bad_date_sippers.append(s)
                         continue
         if self.bad_date_sippers:
@@ -2222,7 +2225,9 @@ class SipperViz(tk.Tk):
                                                        filetypes=filetypes)
             if savepath:
                 if plot.func in [
-                        sipperplots.interdrink_intervals
+                        sipperplots.interdrink_intervals,
+                        sipperplots.interdrink_intervals_byside,
+                        sipperplots.interdrink_intervals_bycontent,
                         ]:
                     path = self.create_file_name(savepath)
                     base_path, ext = os.path.splitext(path)
@@ -2271,7 +2276,9 @@ class SipperViz(tk.Tk):
         self.create_window.title('Enter a group name')
         self.create_name = tk.StringVar()
         self.create_name.set('')
-        self.create_name.trace_add('write',self.create_group_check)
+        v = addto
+        self.create_name.trace_add('write', lambda i=v, *args :
+                                   self.create_group_check(addto=i))
         self.warning_var = tk.StringVar()
         self.warning_var.set('')
         warning_label = tk.Label(self.create_window,
@@ -2294,25 +2301,30 @@ class SipperViz(tk.Tk):
 
     def create_okay(self, addto):
         group_name = self.create_name.get()
-        self.loaded_groups.append(group_name)
         if addto:
             selected = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]
             for s in selected:
                 if group_name not in s.groups:
                     s.groups.append(group_name)
-        self.groupview.insert('', 'end', iid=group_name, text=group_name)
-        self.groupview.selection_set(group_name)
+        if group_name not in self.loaded_groups:
+            self.loaded_groups.append(group_name)
+            self.groupview.insert('', 'end', iid=group_name, text=group_name)
+            self.groupview.selection_set(group_name)
         self.update_all_buttons()
         self.create_window.destroy()
 
-    def create_group_check(self, *args):
+    def create_group_check(self, addto=False, *args):
         new_name = self.create_name.get()
         if new_name == '':
             self.ok_button_create.configure(state=tk.DISABLED)
         else:
             if new_name in self.loaded_groups:
-                self.warning_var.set('Group already in use!')
-                self.ok_button_create.configure(state=tk.DISABLED)
+                if addto:
+                    self.warning_var.set('Add to existing group {}.'.format(new_name))
+                    self.ok_button_create.configure(state=tk.NORMAL)
+                else:
+                    self.warning_var.set('Group already in use!')
+                    self.ok_button_create.configure(state=tk.DISABLED)
             else:
                 self.warning_var.set('')
                 self.ok_button_create.configure(state=tk.NORMAL)
@@ -2428,20 +2440,20 @@ class SipperViz(tk.Tk):
         self.update()
 
     def update_groupview_buttons(self, *event):
-        groups = self.groupview.selection()
+        groups_selected = self.groupview.selection()
         files = self.file_view.selection()
-        if files and groups:
+        if files and groups_selected:
             self.group_add.configure(state='normal')
             self.group_remove.configure(state='normal')
-            self.group_delete.configure(state='normal')
         else:
             self.group_add.configure(state='disabled')
             self.group_remove.configure(state='disabled')
-            self.group_delete.configure(state='disabled')
-        if groups:
+        if groups_selected:
+            self.group_delete.configure(state='normal')
             self.group_select.configure(state='normal')
         else:
             self.group_select.configure(state='disabled')
+            self.group_delete.configure(state='disabled')
 
     def update_avail_groups(self):
         self.avail_groups = []
@@ -2506,10 +2518,12 @@ class SipperViz(tk.Tk):
         selected_contents = list(self.contentselect.selection())
         drink_content = selected_contents if self.drink_showcontent_val.get() else []
         circ_content = selected_contents if self.circ_showcontent_val.get() else []
+        idi_content = selected_contents
         pref_content = selected_contents
         settings_dict['show_content'] = drink_content
         settings_dict['circ_content'] = circ_content
         settings_dict['pref_content'] = pref_content
+        settings_dict['idi_content'] = idi_content
         for time_setting in ['lights_on','lights_off']:
             settings_dict[time_setting] = self.times_to_int[settings_dict[time_setting]]
         for bin_setting in ['binsize', 'pref_bins', 'avg_bins']:
@@ -2628,7 +2642,7 @@ class SipperViz(tk.Tk):
         for arg in used_args.keys():
             if arg in change_df.index:
                 change_df.loc[arg,'Value'] = used_args[arg]
-            if arg in ['show_content', 'circ_content', 'pref_content']:
+            if arg in ['show_content', 'circ_content', 'pref_content', 'idi_content']:
                 c_list = used_args[arg]
         self.load_settings_df(from_df=change_df)
         if c_list:
@@ -2781,7 +2795,7 @@ class SipperViz(tk.Tk):
                     return
         self.close_content_window()
         self.display_details()
-        self.update_avail_contents()
+        self.update_all_buttons()
 
     def clear_contents(self):
         files = [self.loaded_sippers[int(i)] for i in self.file_view.selection()]

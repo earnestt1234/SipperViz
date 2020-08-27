@@ -241,11 +241,11 @@ def interdrink_intervals_byside(sippers, kde=True, logx=True, **kwargs):
     kde_df.index.name = 'log10(minutes)' if logx else 'minutes'
     return bar_df, kde_df
 
-def interdrink_intervals_bycontent(sippers, show_content, kde=True, logx=True,
+def interdrink_intervals_bycontent(sippers, idi_content, kde=True, logx=True,
                                    **kwargs):
     bar_df = pd.DataFrame()
     kde_df = pd.DataFrame()
-    for c in show_content:
+    for c in idi_content:
         combined = []
         fig = plt.figure()
         plt.clf()

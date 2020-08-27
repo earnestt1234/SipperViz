@@ -1025,7 +1025,7 @@ def interdrink_intervals_byside(sippers, kde=True, logx=True, **kwargs):
     plt.tight_layout()
     return fig if 'ax' not in kwargs else None
 
-def interdrink_intervals_bycontent(sippers, show_content, kde=True, logx=True, **kwargs):
+def interdrink_intervals_bycontent(sippers, idi_content, kde=True, logx=True, **kwargs):
     """
     Plot a histogram of the interdrink intervals of multiple Sippers,
     with one curve for each included content
@@ -1056,7 +1056,7 @@ def interdrink_intervals_bycontent(sippers, show_content, kde=True, logx=True, *
     else:
         ax = kwargs['ax']
     setup_idi_axes(ax, logx)
-    for c in show_content:
+    for c in idi_content:
         combined = []
         for sipper in sippers:
             df = sipper.data.copy()
