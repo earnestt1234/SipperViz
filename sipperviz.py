@@ -2340,7 +2340,7 @@ class SipperViz(tk.Tk):
             settings_dict[bin_setting] = self.bin_convert[settings_dict[bin_setting]]
         method_d = {'Absolute Time' : 'datetime',
                     'Relative Time': 'time',
-                    'Elapsed Time': 'elpased'}
+                    'Elapsed Time': 'elapsed'}
         settings_dict['averaging'] = method_d[settings_dict['averaging']]
         return settings_dict
 
