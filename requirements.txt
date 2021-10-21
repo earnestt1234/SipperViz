@@ -1,4 +1,4 @@
-Babel==2.8.0
+Babel==2.9.1
 certifi==2020.6.20
 cycler==0.10.0
 kiwisolver==1.2.0
